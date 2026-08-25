@@ -42,6 +42,12 @@
       ],
       "stipple-gl/presets": [
         "./src/presets/index.ts"
+      ],
+      "stipple-gl/worker": [
+        "./src/worker/index.ts"
+      ],
+      "stipple-gl/lite": [
+        "./src/lite.ts"
       ]
     }
   },

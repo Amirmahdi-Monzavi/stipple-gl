@@ -1,6 +1,7 @@
 import { Stipple, defaultOptions, mergeOptions, shapeFromString } from 'stipple-gl';
 import { presets } from 'stipple-gl/presets';
-import type { ShapeConfig, StippleConfig, StippleOptions } from 'stipple-gl';
+import type { ShapeConfig, StippleConfig, StippleInstance, StippleOptions } from 'stipple-gl';
+import { WorkerStipple } from 'stipple-gl/worker';
 
 import { buildPanel, controlGroups } from './controls';
 import { shapeNames, shapes } from './shapes';
@@ -23,15 +24,29 @@ let activeShape = 'shield';
 let customShape: ShapeConfig | null = null;
 let morphTarget = 1;
 
-const instance = new Stipple(stage, config);
+const useWorker = new URLSearchParams(location.search).has('worker');
+
+const instance: StippleInstance = useWorker
+  ? new WorkerStipple(stage, {
+      ...config,
+      worker: new Worker(new URL('../../src/worker/thread.ts', import.meta.url), {
+        type: 'module',
+      }),
+      onDroppedOptions: (keys: string[]) => {
+        console.info('[stipple-gl] worker mode dropped non-serialisable options:', keys);
+      },
+    })
+  : new Stipple(stage, config);
 
 declare global {
   interface Window {
-    stipple: Stipple;
+    stipple: StippleInstance;
+    stippleMode: string;
   }
 }
 
 window.stipple = instance;
+window.stippleMode = useWorker ? 'worker' : 'main';
 
 const toast = (message: string): void => {
   const node = document.createElement('div');
@@ -294,7 +309,8 @@ const updateStat = (now: number): void => {
 
   const total = config.count + config.minorCount;
   statEl.textContent =
-    total.toLocaleString() + ' particles  ·  ' + (instance.fps || 60) + ' fps  ·  cpu backend';
+    total.toLocaleString() + '  ·  ' + (instance.fps || 60) + ' fps  ·  ' +
+    (useWorker ? 'worker thread' : 'main thread');
 };
 
 requestAnimationFrame(updateStat);

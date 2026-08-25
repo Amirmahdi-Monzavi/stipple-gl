@@ -146,6 +146,28 @@ The engine handles the things that separate a demo from a library:
 
 ---
 
+## Running off the main thread
+
+The engine splits in two:
+
+```
+Runtime        no DOM at all - gl, renderer, backend, frame state, step, render
+StippleCore    the browser half - canvas, observers, pointer, rAF loop
+WorkerStipple  the same browser half, forwarding messages instead of calling directly
+```
+
+`Runtime` never touches `document`, `window`, `ResizeObserver` or `IntersectionObserver`, which is what lets the identical simulation run inside a worker against an `OffscreenCanvas`. There are tests asserting that separation holds, and that the GL context is created in exactly one place.
+
+The split of labour in worker mode:
+
+| main thread | worker |
+|---|---|
+| resize, pointer, visibility observation | simulation, packing, all GL |
+| SVG parsing (`DOMParser` has no worker equivalent) | rasterising, sampling, target assignment |
+| forwarding messages | the frame loop |
+
+Parsed SVG geometry is plain data — path strings, a fill rule, a stroke width, a six-number matrix — so it clones across the boundary without special handling. Functions do not, which is why `transition.easing` also accepts a name.
+
 ## Why the CPU backend, for now
 
 The rendering is genuinely GPU work. The simulation is not — it is JavaScript on the main thread, and the honest description of this release is *GPU-rendered, CPU-simulated*.

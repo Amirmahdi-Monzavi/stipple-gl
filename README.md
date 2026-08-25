@@ -2,7 +2,9 @@
 
 A WebGL2 particle field that morphs into any SVG.
 
-Zero dependencies. Framework agnostic. **11.7 KB gzipped** for the engine, 14 KB with the SVG parser and every behaviour.
+Zero dependencies. Framework agnostic. **9.8 KB gzipped** for a particle background, 14.8 KB with SVG morphing and every behaviour.
+
+Optionally runs the whole simulation on a **Web Worker**, so it costs the main thread nothing.
 
 ```bash
 npm i stipple-gl
@@ -29,9 +31,10 @@ It renders in a **single draw call** with no scene graph, no three.js, and no ru
 
 | | stipple-gl | tsparticles | particles.js |
 |---|---|---|---|
-| gzipped | **11.7 KB** engine · 14 KB full | 22 KB core · 52 KB full | 8.8 KB |
+| gzipped | **9.8 KB** lite · 14.8 KB full | 22 KB core · 52 KB full | 8.8 KB |
 | dependencies | **0** | 14 direct (52 packages) | 0 |
 | renderer | **WebGL2** | canvas 2D | canvas 2D |
+| off-main-thread | **yes, OffscreenCanvas** | no | no |
 | SVG morphing | **built in** | no | no |
 | written in | **TypeScript** | TypeScript | JavaScript |
 | status | active | active | unmaintained |
@@ -110,6 +113,16 @@ import { starfield } from 'stipple-gl/presets';
 <Particles {...starfield} color="#8ab4f8" />;
 ```
 
+### Off the main thread
+
+```ts
+import { createWorkerStipple } from 'stipple-gl/worker';
+
+const stipple = createWorkerStipple('#hero', { count: 8000 });
+```
+
+The canvas is transferred to a Web Worker with `transferControlToOffscreen()`, so simulation and rendering never touch the main thread. Blocking the main thread for 900 ms, a transition kept advancing at 60 fps in worker mode and rendered nothing at all on the main thread. Same API either way — see [docs/worker.md](docs/worker.md).
+
 ### Scroll-driven morphing
 
 ```html
@@ -134,6 +147,16 @@ createScrollMorph(stipple, {
 Particles disperse as a section leaves the viewport and reassemble into the next section's shape. It reads scroll position rather than hijacking it, so it composes with native CSS `scroll-snap` and does not break keyboard or accessibility behaviour. See [docs/scroll.md](docs/scroll.md).
 
 ---
+
+## Three ways to import
+
+| entry | gzipped | what you get |
+|---|---|---|
+| `stipple-gl/lite` | **9.8 KB** | The engine and the ambient layer. No SVG parser, no morph sampling, no emission, pointer or shockwave behaviours. For a particle background. |
+| `stipple-gl` | **14.8 KB** | Everything: SVG parsing and sampling, angular assignment, all behaviours. |
+| `stipple-gl/worker` | +2 KB | The main-thread proxy. The engine itself ships in the worker chunk. |
+
+`stipple-gl/react`, `stipple-gl/scroll` and `stipple-gl/presets` are separate entries too, so you only pay for what you import.
 
 ## Presets
 
@@ -227,6 +250,7 @@ Requires **WebGL2** — Chrome/Edge 56+, Firefox 51+, Safari 15+. The constructo
 - [Scroll and snap](docs/scroll.md)
 - [Shapes and SVG](docs/shapes.md)
 - [Performance](docs/performance.md)
+- [Worker mode](docs/worker.md)
 - [Architecture](docs/architecture.md)
 
 ## Licence

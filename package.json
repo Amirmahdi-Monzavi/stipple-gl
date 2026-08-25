@@ -54,6 +54,13 @@
       "types": "./dist/lite.d.ts",
       "import": "./dist/lite.js",
       "require": "./dist/lite.cjs"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
+    "./worker/thread": {
+      "import": "./dist/thread.js"
     }
   },
   "scripts": {
@@ -66,7 +73,10 @@
     "size": "size-limit",
     "playground": "vite --config playground/vite.config.ts",
     "playground:build": "vite build --config playground/vite.config.ts",
-    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build",
+    "analyze": "node scripts/analyze.mjs",
+    "validate": "pnpm typecheck && pnpm test && pnpm audit-options && pnpm build",
+    "audit-options": "node scripts/audit-options.mjs"
   },
   "peerDependencies": {
     "react": ">=17.0.0",

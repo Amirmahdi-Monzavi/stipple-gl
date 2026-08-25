@@ -1,4 +1,4 @@
-import { noise2 } from '../core/math';
+import { noise2, resolveEasing } from '../core/math';
 import type { Behavior, SimContext } from '../core/types';
 
 export const createMorphBehavior = (): Behavior => ({
@@ -21,7 +21,7 @@ export const createMorphBehavior = (): Behavior => ({
 
     const morph = state.morph;
     const shaped = major.hasShape && morph > 0;
-    const easing = options.transition.easing;
+    const easing = resolveEasing(options.transition.easing);
 
     const stagger = shaped ? Math.min(0.9, Math.max(0, options.transition.stagger)) : 0;
     const span = 1 - stagger;

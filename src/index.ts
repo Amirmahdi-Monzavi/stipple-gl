@@ -20,8 +20,8 @@ export {
   easeOutExpo,
   easeOutBack,
   easeInOutElastic,
+  resolveEasing,
 } from './core/math';
-export type { EasingName } from './core/math';
 
 export { CpuBackend, createCpuBackend } from './backends/cpu';
 
@@ -52,6 +52,7 @@ export type {
   BlendMode,
   DeepPartial,
   Easing,
+  EasingName,
   EmissionOptions,
   FrameState,
   JellyOptions,

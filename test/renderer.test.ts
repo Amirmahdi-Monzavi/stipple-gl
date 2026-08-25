@@ -7,21 +7,21 @@ import { POINT_FRAGMENT_SHADER, POINT_VERTEX_SHADER } from '../src/core/shaders'
 const read = (relative: string): string =>
   readFileSync(resolve(process.cwd(), relative), 'utf8');
 
-const engineSource = read('src/core/engine.ts');
+const runtimeSource = read('src/core/runtime.ts');
 const rendererSource = read('src/core/renderer.ts');
 
 describe('WebGL context attributes', () => {
   it('never requests a desynchronized context', () => {
-    expect(engineSource).not.toMatch(/desynchronized/);
+    expect(runtimeSource).not.toMatch(/desynchronized/);
   });
 
   it('requests a premultiplied-alpha context', () => {
-    expect(engineSource).toMatch(/premultipliedAlpha:\s*true/);
+    expect(runtimeSource).toMatch(/premultipliedAlpha:\s*true/);
   });
 
   it('does not allocate depth or stencil buffers it never uses', () => {
-    expect(engineSource).toMatch(/depth:\s*false/);
-    expect(engineSource).toMatch(/stencil:\s*false/);
+    expect(runtimeSource).toMatch(/depth:\s*false/);
+    expect(runtimeSource).toMatch(/stencil:\s*false/);
   });
 });
 
@@ -38,6 +38,29 @@ describe('alpha pipeline', () => {
 
   it('discards fragments outside the sprite disc', () => {
     expect(POINT_FRAGMENT_SHADER).toMatch(/discard/);
+  });
+});
+
+describe('worker parity', () => {
+  const engineSource = read('src/core/engine.ts');
+  const threadSource = read('src/worker/thread.ts');
+
+  it('creates the GL context in exactly one place', () => {
+    expect(engineSource).not.toMatch(/getContext\(/);
+    expect(threadSource).not.toMatch(/getContext\(/);
+    expect(runtimeSource.match(/getContext\(/g)).toHaveLength(1);
+  });
+
+  it('keeps DOM APIs out of the worker thread', () => {
+    for (const api of ['document', 'window', 'ResizeObserver', 'IntersectionObserver', 'DOMParser']) {
+      expect(threadSource, api).not.toMatch(new RegExp('\b' + api + '\b'));
+    }
+  });
+
+  it('keeps DOM APIs out of the shared runtime', () => {
+    for (const api of ['document', 'window', 'ResizeObserver', 'IntersectionObserver']) {
+      expect(runtimeSource, api).not.toMatch(new RegExp('\b' + api + '\b'));
+    }
   });
 });
 

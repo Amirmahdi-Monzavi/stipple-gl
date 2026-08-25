@@ -19,6 +19,10 @@ export default defineConfig({
         replacement: fileURLToPath(new URL('../src/react/index.ts', import.meta.url)),
       },
       {
+        find: 'stipple-gl/worker',
+        replacement: fileURLToPath(new URL('../src/worker/index.ts', import.meta.url)),
+      },
+      {
         find: /^stipple-gl$/,
         replacement: fileURLToPath(new URL('../src/index.ts', import.meta.url)),
       },

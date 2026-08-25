@@ -28,6 +28,9 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: Dead option audit
+        run: pnpm audit-options
+
       - name: Build
         run: pnpm build
 

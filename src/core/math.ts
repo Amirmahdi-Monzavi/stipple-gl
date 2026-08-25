@@ -1,4 +1,4 @@
-import type { Easing, RGB } from './types';
+import type { Easing, EasingName, RGB } from './types';
 
 export const clamp = (v: number, min: number, max: number): number =>
   v < min ? min : v > max ? max : v;
@@ -59,16 +59,17 @@ export const easeInOutElastic: Easing = (t) => {
     : (Math.pow(2, -20 * t + 10) * Math.sin((20 * t - 11.125) * c5)) / 2 + 1;
 };
 
-export const easings = {
+export const easings: Record<EasingName, Easing> = {
   linear: easeLinear,
   inOutCubic: easeInOutCubic,
   inOutQuad: easeInOutQuad,
   outExpo: easeOutExpo,
   outBack: easeOutBack,
   inOutElastic: easeInOutElastic,
-} as const;
+};
 
-export type EasingName = keyof typeof easings;
+export const resolveEasing = (value: Easing | EasingName): Easing =>
+  typeof value === 'function' ? value : (easings[value] ?? easeInOutCubic);
 
 const HEX_SHORT = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
 const HEX_LONG = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i;

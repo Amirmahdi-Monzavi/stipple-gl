@@ -7,6 +7,8 @@ export default defineConfig({
     react: 'src/react/index.ts',
     scroll: 'src/scroll/index.ts',
     presets: 'src/presets/index.ts',
+    worker: 'src/worker/index.ts',
+    thread: 'src/worker/thread.ts',
   },
   format: ['esm', 'cjs'],
   dts: true,

@@ -76,7 +76,7 @@ export interface EmissionOptions {
 
 export interface TransitionOptions {
   speed: number;
-  easing: Easing;
+  easing: Easing | EasingName;
   assign: 'angular' | 'index' | 'random';
   settle: number;
   stagger: number;
@@ -193,6 +193,14 @@ export type DeepPartial<T> = {
 };
 
 export type Easing = (t: number) => number;
+
+export type EasingName =
+  | 'linear'
+  | 'inOutCubic'
+  | 'inOutQuad'
+  | 'outExpo'
+  | 'outBack'
+  | 'inOutElastic';
 
 export interface Viewport {
   width: number;
