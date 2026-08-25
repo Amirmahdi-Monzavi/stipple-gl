@@ -14,7 +14,6 @@ import type {
   Viewport,
 } from './types';
 import { CpuBackend } from '../backends/cpu';
-import { sampleShape, shapeBounds } from '../sources/sample';
 
 export type StippleTarget = HTMLElement | HTMLCanvasElement | string;
 
@@ -40,7 +39,7 @@ const prefersReducedMotion = (): boolean =>
   typeof window.matchMedia === 'function' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export class Stipple implements StippleInstance {
+export class StippleCore implements StippleInstance {
   readonly canvas: HTMLCanvasElement;
 
   private host: HTMLElement;
@@ -134,6 +133,7 @@ export class Stipple implements StippleInstance {
       morph: 0,
       targetMorph: 0,
       hasShape: false,
+      shapeColor: null,
       viewport: this.viewport,
       pointer: this.pointer,
       shockwaves: this.shockwaves,
@@ -144,6 +144,7 @@ export class Stipple implements StippleInstance {
     this.backend.init({ gl, options: this.opts, viewport: this.viewport });
     this.measure();
     this.backend.reallocate(this.opts.count, this.opts.minorCount, this.viewport);
+    this.backend.precompute(this.opts);
     this.renderer.allocate(this.backend.capacity);
 
     this.bind();
@@ -370,6 +371,7 @@ export class Stipple implements StippleInstance {
     } else {
       this.backend.layout(this.viewport);
     }
+    this.backend.precompute(this.opts);
 
     if (this.shape) this.applyShape(this.shape);
 
@@ -394,16 +396,26 @@ export class Stipple implements StippleInstance {
 
   private applyShape(shape: ShapeConfig): void {
     if (this.degenerate) return;
+
+    const shapes = this.opts.shapes;
+    if (!shapes) {
+      this.opts.onError?.(
+        fail('setShape needs the SVG sampler. Import Stipple from "stipple-gl", not "stipple-gl/lite".'),
+      );
+      return;
+    }
+
     const count = Math.min(shape.count ?? this.opts.count, this.opts.count);
-    const points = sampleShape(shape, count, this.viewport.width, this.viewport.height);
+    const points = shapes.sample(shape, count, this.viewport.width, this.viewport.height);
 
     if (points.length === 0) {
       this.backend.setShape(null, this.opts);
       this.state.hasShape = false;
+      this.state.shapeColor = null;
       return;
     }
 
-    const bounds = shapeBounds(points);
+    const bounds = shapes.bounds(points);
     this.shapeBox.minX = bounds.minX;
     this.shapeBox.minY = bounds.minY;
     this.shapeBox.maxX = bounds.maxX;
@@ -411,6 +423,7 @@ export class Stipple implements StippleInstance {
 
     this.backend.setShape(points, this.opts);
     this.state.hasShape = true;
+    this.state.shapeColor = shape.color ?? null;
   }
 
   private updateCamera(dt: number): void {
@@ -546,6 +559,7 @@ export class Stipple implements StippleInstance {
     if (!shape || shape.paths.length === 0) {
       this.backend.setShape(null, this.opts);
       this.state.hasShape = false;
+      this.state.shapeColor = null;
       return;
     }
     this.applyShape(shape);
@@ -559,6 +573,10 @@ export class Stipple implements StippleInstance {
     const previousMinor = this.opts.minorCount;
     const previousBehaviors = this.opts.behaviors;
     const previousRadius = this.opts.spread.radius;
+    const previousVolume = this.opts.spread.volume;
+    const previousOrder = this.opts.transition.order;
+    const previousMajorBias = this.opts.major.sizeBias;
+    const previousMinorBias = this.opts.minor.sizeBias;
 
     this.opts = mergeOptions(this.opts, config);
 
@@ -568,10 +586,21 @@ export class Stipple implements StippleInstance {
 
     if (this.opts.count !== previousCount || this.opts.minorCount !== previousMinor) {
       this.backend.reallocate(this.opts.count, this.opts.minorCount, this.viewport);
+      this.backend.precompute(this.opts);
       this.renderer.allocate(this.backend.capacity);
       if (this.shape) this.applyShape(this.shape);
-    } else if (this.opts.spread.radius !== previousRadius) {
+    } else if (
+      this.opts.spread.radius !== previousRadius ||
+      this.opts.spread.volume !== previousVolume
+    ) {
       this.backend.layout(this.viewport);
+      this.backend.precompute(this.opts);
+    } else if (
+      this.opts.transition.order !== previousOrder ||
+      this.opts.major.sizeBias !== previousMajorBias ||
+      this.opts.minor.sizeBias !== previousMinorBias
+    ) {
+      this.backend.precompute(this.opts);
     }
 
     if (this.opts.blend !== previousBlend) this.renderer.setBlend(this.opts.blend);
@@ -595,6 +624,7 @@ export class Stipple implements StippleInstance {
     if (backend.majorCount === majors && backend.minorCount === minors) return;
 
     backend.reallocate(majors, minors, this.viewport);
+    backend.precompute(this.opts);
     this.renderer.allocate(backend.capacity);
     if (this.shape) this.applyShape(this.shape);
   }
@@ -646,5 +676,4 @@ export class Stipple implements StippleInstance {
   }
 }
 
-export const createStipple = (target: StippleTarget, config?: StippleConfig): Stipple =>
-  new Stipple(target, config);
+

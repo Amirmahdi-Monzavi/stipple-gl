@@ -28,8 +28,4 @@ export const createDefaultBehaviors = (): Behavior[] => [
   createEmissionBehavior(),
 ];
 
-export const createMinimalBehaviors = (): Behavior[] => [
-  createMorphBehavior(),
-  createIntegrateBehavior(),
-  createDriftBehavior(),
-];
+export { createMinimalBehaviors } from './minimal';

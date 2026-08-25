@@ -49,7 +49,12 @@
       "import": "./dist/presets.js",
       "require": "./dist/presets.cjs"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./lite": {
+      "types": "./dist/lite.d.ts",
+      "import": "./dist/lite.js",
+      "require": "./dist/lite.cjs"
+    }
   },
   "scripts": {
     "build": "tsup",
@@ -92,16 +97,22 @@
   },
   "size-limit": [
     {
-      "name": "core (full engine, zero deps)",
+      "name": "lite (particles only)",
+      "path": "dist/lite.js",
+      "import": "{ Stipple }",
+      "limit": "10 kB"
+    },
+    {
+      "name": "core (engine + SVG morphing)",
       "path": "dist/index.js",
       "import": "{ Stipple }",
-      "limit": "14 kB"
+      "limit": "13 kB"
     },
     {
       "name": "core + react binding",
       "path": "dist/react.js",
       "import": "{ Particles }",
-      "limit": "15 kB"
+      "limit": "14 kB"
     },
     {
       "name": "scroll module",

@@ -1,4 +1,5 @@
-export { Stipple, createStipple } from './core/engine';
+export { Stipple, createStipple } from './stipple';
+export { StippleCore } from './core/engine';
 export type { StippleTarget } from './core/engine';
 
 export { defaultOptions, resolveOptions, mergeOptions, responsiveCount } from './core/options';
@@ -44,6 +45,7 @@ export { assignTargets, releaseAssignScratch } from './sources/assign';
 export type { AssignMode } from './sources/assign';
 
 export { shapeFromSVG, shapeFromString, shapeFromURL, fitShapeToElement } from './sources/shape';
+export { shapeSupport } from './sources/support';
 
 export type {
   Behavior,
@@ -66,8 +68,10 @@ export type {
   ShapeConfig,
   Shockwave,
   SimContext,
+  ShapeSupport,
   SimulationBackend,
   SpreadOptions,
+  StaggerOrder,
   StippleConfig,
   StippleInstance,
   StippleOptions,

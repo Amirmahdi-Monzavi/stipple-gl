@@ -3,6 +3,7 @@ import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { writeFileSync, unlinkSync } from 'node:fs';
 
 const cases = {
+  'lite (particles only)': 'src/lite.ts',
   'index (full)': 'src/index.ts',
   react: 'src/react/index.ts',
   scroll: 'src/scroll/index.ts',
@@ -35,13 +36,20 @@ for (const [name, entry] of Object.entries(cases)) {
 }
 
 const probes = {
-  'Stipple only': "export { Stipple } from './src/core/engine';",
-  'starfield preset': "export { Stipple } from './src/core/engine';\nexport { starfield } from './src/presets';",
+  'engine, no SVG parser': ["export { Stipple } from './src/lite';"],
+  'lite + starfield preset': [
+    "export { Stipple } from './src/lite';",
+    "export { starfield } from './src/presets';",
+  ],
+  'full + react': [
+    "export { Stipple } from './src/stipple';",
+    "export { Particles } from './src/react';",
+  ],
 };
 
-for (const [name, source] of Object.entries(probes)) {
+for (const [name, lines] of Object.entries(probes)) {
   const file = '.probe.ts';
-  writeFileSync(file, source);
+  writeFileSync(file, lines.join('\n'));
   try {
     console.log(row(name, await bundle(file)));
   } finally {

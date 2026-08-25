@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { Stipple } from '../core/engine';
+import { Stipple } from '../stipple';
 import type { ShapeConfig, StippleConfig } from '../core/types';
 import { shapeFromURL } from '../sources/shape';
 

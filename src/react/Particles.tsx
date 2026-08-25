@@ -1,7 +1,7 @@
 import { forwardRef, useImperativeHandle } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 
-import type { Stipple } from '../core/engine';
+import type { Stipple } from '../stipple';
 import type { RenderMode } from '../core/types';
 import { useStipple } from './useStipple';
 import type { UseStippleOptions } from './useStipple';

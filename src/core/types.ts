@@ -80,8 +80,13 @@ export interface TransitionOptions {
   assign: 'angular' | 'index' | 'random';
   settle: number;
   stagger: number;
+  order: StaggerOrder;
+  sweep: number;
+  sweepWidth: number;
   turbulence: number;
 }
+
+export type StaggerOrder = 'random' | 'x' | 'y' | 'radial' | 'angular';
 
 export interface SpreadOptions {
   radius: number;
@@ -114,6 +119,34 @@ export interface PointerOptions {
   shockwaveThickness: number;
 }
 
+export interface ShapeSupport {
+  sample(
+    shape: ShapeConfig,
+    count: number,
+    width: number,
+    height: number,
+  ): Float32Array;
+  bounds(points: Float32Array): {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+    cx: number;
+    cy: number;
+  };
+  assign(
+    mode: 'angular' | 'index' | 'random',
+    points: Float32Array,
+    count: number,
+    spreadX: Float32Array,
+    spreadY: Float32Array,
+    outX: Float32Array,
+    outY: Float32Array,
+    outZ: Float32Array,
+    depth: number,
+  ): void;
+}
+
 export interface StippleOptions {
   count: number;
   minorCount: number;
@@ -139,6 +172,7 @@ export interface StippleOptions {
   jelly: JellyOptions;
   pointer: PointerOptions;
   behaviors: Behavior[] | null;
+  shapes: ShapeSupport | null;
   backend: BackendFactory | null;
   onReady: ((instance: StippleInstance) => void) | null;
   onError: ((error: Error) => void) | null;
@@ -189,6 +223,7 @@ export interface FrameState {
   morph: number;
   targetMorph: number;
   hasShape: boolean;
+  shapeColor: string | null;
   viewport: Viewport;
   pointer: PointerState;
   shockwaves: Shockwave[];
@@ -213,6 +248,10 @@ export interface MajorState {
   vz: Float32Array;
   seed: Float32Array;
   glow: Float32Array;
+  flash: Float32Array;
+  sizeRoll: Float32Array;
+  brightRoll: Float32Array;
+  delay: Float32Array;
   tx: Float32Array;
   ty: Float32Array;
   tz: Float32Array;
@@ -237,6 +276,8 @@ export interface MinorState {
   size: Float32Array;
   opacity: Float32Array;
   seed: Float32Array;
+  sizeRoll: Float32Array;
+  brightRoll: Float32Array;
 }
 
 export interface EmissionState {
@@ -286,6 +327,7 @@ export interface SimulationBackend {
   init(ctx: BackendContext): void;
   reallocate(count: number, minorCount: number, viewport: Viewport): void;
   layout(viewport: Viewport): void;
+  precompute(options: StippleOptions): void;
   setShape(points: Float32Array | null, options: StippleOptions): void;
   step(state: FrameState, options: StippleOptions): void;
   pack(target: PackTarget, options: StippleOptions, state: FrameState): number;

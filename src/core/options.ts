@@ -57,6 +57,9 @@ export const defaultOptions: StippleOptions = {
     assign: 'angular',
     settle: 0.1,
     stagger: 0.38,
+    order: 'radial',
+    sweep: 0.9,
+    sweepWidth: 0.22,
     turbulence: 16,
   },
   spread: {
@@ -88,6 +91,7 @@ export const defaultOptions: StippleOptions = {
     shockwaveThickness: 110,
   },
   behaviors: null,
+  shapes: null,
   backend: null,
   onReady: null,
   onError: null,

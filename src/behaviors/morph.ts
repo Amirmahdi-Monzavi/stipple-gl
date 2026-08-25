@@ -1,4 +1,4 @@
-import { hash2i, noise2 } from '../core/math';
+import { noise2 } from '../core/math';
 import type { Behavior, SimContext } from '../core/types';
 
 export const createMorphBehavior = (): Behavior => ({
@@ -29,6 +29,10 @@ export const createMorphBehavior = (): Behavior => ({
     const flatEase = stagger > 0 ? 0 : easing(morph);
     const time = state.time * 0.001;
 
+    const sweep = options.transition.sweep;
+    const sweepWidth = Math.max(0.02, options.transition.sweepWidth);
+    const sweeping = sweep > 0 && stagger > 0 && morph > 0 && morph < 1;
+
     for (let i = 0; i < count; i++) {
       const lx = major.spreadX[i]!;
       const ly = major.spreadY[i]!;
@@ -46,13 +50,24 @@ export const createMorphBehavior = (): Behavior => ({
         major.tx[i] = sx;
         major.ty[i] = sy;
         major.tz[i] = rz;
+        if (major.flash[i] !== 0) major.flash[i] = 0;
         continue;
       }
 
       let local = morph;
+      let launch = 0;
+
       if (stagger > 0) {
-        local = (morph - hash2i(i, 5077) * stagger) / span;
+        launch = major.delay[i]! * stagger;
+        local = (morph - launch) / span;
         local = local < 0 ? 0 : local > 1 ? 1 : local;
+      }
+
+      if (sweeping) {
+        const distance = Math.abs(morph - launch);
+        major.flash[i] = distance < sweepWidth ? (1 - distance / sweepWidth) * sweep : 0;
+      } else if (major.flash[i] !== 0) {
+        major.flash[i] = 0;
       }
 
       const eased = stagger > 0 ? easing(local) : flatEase;

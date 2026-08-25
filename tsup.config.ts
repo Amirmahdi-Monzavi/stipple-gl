@@ -3,6 +3,7 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     index: 'src/index.ts',
+    lite: 'src/lite.ts',
     react: 'src/react/index.ts',
     scroll: 'src/scroll/index.ts',
     presets: 'src/presets/index.ts',
