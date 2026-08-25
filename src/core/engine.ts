@@ -125,9 +125,10 @@ export class Stipple implements StippleInstance {
     const gl = this.canvas.getContext('webgl2', {
       antialias: true,
       alpha: true,
-      premultipliedAlpha: false,
+      premultipliedAlpha: true,
+      depth: false,
+      stencil: false,
       powerPreference: 'high-performance',
-      desynchronized: true,
     });
 
     if (!gl) {

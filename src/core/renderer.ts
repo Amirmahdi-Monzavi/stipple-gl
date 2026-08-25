@@ -97,9 +97,9 @@ export class PointRenderer {
   setBlend(mode: BlendMode): void {
     const gl = this.gl;
     if (mode === 'additive') {
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      gl.blendFunc(gl.ONE, gl.ONE);
     } else {
-      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     }
   }
 

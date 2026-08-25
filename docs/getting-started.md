@@ -133,6 +133,38 @@ try {
 
 Or pass `onError` to catch both construction failures and async shape-loading errors.
 
+## Troubleshooting
+
+### The canvas is black / nothing renders
+
+Work through these in order:
+
+1. **Does the host element have a height?** In `mode: 'container'` the canvas fills its host. A host with `height: auto` and no content collapses to zero, and the engine correctly refuses to allocate. Give it an explicit height and a non-`static` position.
+2. **Is something painted over it?** The canvas sits at the start of its host. A sibling with a solid background and a higher stacking order will cover it. The canvas is `pointer-events: none` and `aria-hidden`, so it is meant to sit behind your content, not in front.
+3. **Is the loop running?** Check `stipple.running` and `stipple.fps`. If `running` is `false`, the field is either offscreen (`autoPause`), in a hidden tab, or the user prefers reduced motion.
+4. **Is the colour visible against the background?** A dark particle colour on a dark page is invisible. Try `color: '#ffffff'` to rule it out.
+5. **Did the context actually come up?** `stipple.canvas.getContext('webgl2').isContextLost()` should be `false`.
+
+If the pixels are there but the screen is not, the framebuffer will tell you:
+
+```ts
+const gl = stipple.canvas.getContext('webgl2');
+const { width: w, height: h } = stipple.canvas;
+const px = new Uint8Array(w * h * 4);
+gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+console.log('lit pixels', px.filter((_, i) => i % 4 === 3 && px[i] > 8).length);
+```
+
+A high count with a black screen means the GL output is correct and the browser is failing to composite it — a context-attribute or stacking problem, not a simulation one.
+
+### Colours look washed out or too dark
+
+The engine requests a `premultipliedAlpha: true` context and emits premultiplied colour from the fragment shader, paired with `ONE / ONE_MINUS_SRC_ALPHA` blending. If you supply your own renderer or blend factors, they must agree — mixing premultiplied output with `SRC_ALPHA` blending under-accumulates the alpha channel and renders everything roughly three times too dark.
+
+### The shape is off-centre or the wrong size
+
+`scale` is relative to a best-fit of the viewBox in the canvas, and `position` is fractional, not pixels. A viewBox that is much larger than the artwork inside it will make the shape look small — trim it in your editor, or use `fitShapeToElement`.
+
 ## Next
 
 - [Options reference](options.md)

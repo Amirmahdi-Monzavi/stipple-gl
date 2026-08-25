@@ -26,5 +26,5 @@ void main(){
   float r = dot(p, p);
   if (r > 1.0) discard;
   float alpha = pow(smoothstep(1.0, 0.0, r), uSoftness) * vColor.a;
-  outColor = vec4(vColor.rgb, alpha);
+  outColor = vec4(vColor.rgb * alpha, alpha);
 }`;
