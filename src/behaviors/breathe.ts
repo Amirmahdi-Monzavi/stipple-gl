@@ -16,7 +16,7 @@ export const createBreatheBehavior = (): Behavior => ({
       const phase = time * (0.02 + (seed % 100) / 4000) + seed * 10;
       const fast = (Math.sin(phase) + 1) * 0.5;
       const slow = (Math.sin(phase * 0.15 + seed * 5) + 1) * 0.5;
-      const value = (0.2 + fast * 0.7) * (0.85 + slow * 0.15);
+      const value = (0.72 + fast * 0.28) * (0.92 + slow * 0.08);
       major.glow[i] = 1 + (value - 1) * amount;
     }
   },

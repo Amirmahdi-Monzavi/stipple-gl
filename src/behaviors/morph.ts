@@ -1,4 +1,4 @@
-import { noise2 } from '../core/math';
+import { hash2i, noise2 } from '../core/math';
 import type { Behavior, SimContext } from '../core/types';
 
 export const createMorphBehavior = (): Behavior => ({
@@ -9,28 +9,74 @@ export const createMorphBehavior = (): Behavior => ({
     const count = major.count;
     if (count === 0) return;
 
-    const eased = options.transition.easing(state.morph);
+    const centerX = state.viewport.width * 0.5;
+    const centerY = state.viewport.height * 0.5;
 
-    if (major.hasShape && eased > 0) {
-      for (let i = 0; i < count; i++) {
-        const sx = major.spreadX[i]!;
-        const sy = major.spreadY[i]!;
-        const sz = major.spreadZ[i]!;
-        major.tx[i] = sx + (major.shapeX[i]! - sx) * eased;
-        major.ty[i] = sy + (major.shapeY[i]! - sy) * eased;
-        major.tz[i] = sz + (major.shapeZ[i]! - sz) * eased;
+    const spin = state.spin;
+    const cosSpin = Math.cos(spin);
+    const sinSpin = Math.sin(spin);
+    const tilt = options.spread.tilt;
+    const cosTilt = Math.cos(tilt);
+    const sinTilt = Math.sin(tilt);
+
+    const morph = state.morph;
+    const shaped = major.hasShape && morph > 0;
+    const easing = options.transition.easing;
+
+    const stagger = shaped ? Math.min(0.9, Math.max(0, options.transition.stagger)) : 0;
+    const span = 1 - stagger;
+    const turbulence = shaped ? options.transition.turbulence : 0;
+    const flatEase = stagger > 0 ? 0 : easing(morph);
+    const time = state.time * 0.001;
+
+    for (let i = 0; i < count; i++) {
+      const lx = major.spreadX[i]!;
+      const ly = major.spreadY[i]!;
+      const lz = major.spreadZ[i]!;
+
+      const rx = lx * cosSpin + lz * sinSpin;
+      const rzSpin = lz * cosSpin - lx * sinSpin;
+      const ry = ly * cosTilt - rzSpin * sinTilt;
+      const rz = ly * sinTilt + rzSpin * cosTilt;
+
+      const sx = centerX + rx;
+      const sy = centerY + ry;
+
+      if (!shaped) {
+        major.tx[i] = sx;
+        major.ty[i] = sy;
+        major.tz[i] = rz;
+        continue;
       }
-    } else {
-      major.tx.set(major.spreadX.subarray(0, count));
-      major.ty.set(major.spreadY.subarray(0, count));
-      major.tz.set(major.spreadZ.subarray(0, count));
+
+      let local = morph;
+      if (stagger > 0) {
+        local = (morph - hash2i(i, 5077) * stagger) / span;
+        local = local < 0 ? 0 : local > 1 ? 1 : local;
+      }
+
+      const eased = stagger > 0 ? easing(local) : flatEase;
+
+      let tx = sx + (major.shapeX[i]! - sx) * eased;
+      let ty = sy + (major.shapeY[i]! - sy) * eased;
+      const tz = rz + (major.shapeZ[i]! - rz) * eased;
+
+      if (turbulence > 0 && local > 0 && local < 1) {
+        const burst = local * (1 - local) * 4;
+        const amount = burst * turbulence;
+        tx += (noise2(i * 0.13, time * 0.7) - 0.5) * amount;
+        ty += (noise2(i * 0.17 + 55.3, time * 0.7) - 0.5) * amount;
+      }
+
+      major.tx[i] = tx;
+      major.ty[i] = ty;
+      major.tz[i] = tz;
     }
 
-    const spreadWeight = 1 - state.morph;
+    const spreadWeight = 1 - morph;
     if (spreadWeight <= 0.001) return;
 
     const flowScale = options.spread.flow;
-    const time = state.time * 0.001;
     const blend = 0.015 * spreadWeight;
 
     for (let i = 0; i < count; i++) {

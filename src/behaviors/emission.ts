@@ -40,24 +40,18 @@ const spawn = (
   emission.count = i + 1;
 };
 
+const FIELDS = [
+  'x', 'y', 'z', 'vx', 'vy', 'vz', 'life', 'maxLife',
+  'size', 'baseSize', 'opacity', 'angle', 'r', 'g', 'b',
+] as const;
+
 const remove = (emission: EmissionState, i: number): void => {
   const last = emission.count - 1;
   if (i !== last) {
-    emission.x[i] = emission.x[last]!;
-    emission.y[i] = emission.y[last]!;
-    emission.z[i] = emission.z[last]!;
-    emission.vx[i] = emission.vx[last]!;
-    emission.vy[i] = emission.vy[last]!;
-    emission.vz[i] = emission.vz[last]!;
-    emission.life[i] = emission.life[last]!;
-    emission.maxLife[i] = emission.maxLife[last]!;
-    emission.size[i] = emission.size[last]!;
-    emission.baseSize[i] = emission.baseSize[last]!;
-    emission.opacity[i] = emission.opacity[last]!;
-    emission.angle[i] = emission.angle[last]!;
-    emission.r[i] = emission.r[last]!;
-    emission.g[i] = emission.g[last]!;
-    emission.b[i] = emission.b[last]!;
+    for (const field of FIELDS) {
+      const column = emission[field];
+      column[i] = column[last]!;
+    }
   }
   emission.count = last;
 };

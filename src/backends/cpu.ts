@@ -1,4 +1,4 @@
-import { fibonacciSphere, noise2, parseColor, rand } from '../core/math';
+import { fibonacciSphere, hash2i, noise2, parseColor, rand } from '../core/math';
 import { packColor } from '../core/renderer';
 import type {
   BackendContext,
@@ -84,14 +84,25 @@ export class CpuBackend implements SimulationBackend {
   private context: SimContext | null = null;
   private pendingShape: Float32Array | null = null;
   private sphereVec = { x: 0, y: 0, z: 0 };
-  private spreadRadius = 0.6;
+  private spreadRadius = 0.62;
+  private spreadVolume = 1;
+  radiusPx = 1;
 
   get capacity(): number {
     return this.major.capacity + this.minor.capacity + this.emission.capacity;
   }
 
+  get majorCount(): number {
+    return this.major.count;
+  }
+
+  get minorCount(): number {
+    return this.minor.count;
+  }
+
   init(ctx: BackendContext): void {
     this.spreadRadius = ctx.options.spread.radius;
+    this.spreadVolume = ctx.options.spread.volume;
     const behaviors = ctx.options.behaviors ?? createDefaultBehaviors();
     this.behaviors = [...behaviors].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
   }
@@ -126,29 +137,36 @@ export class CpuBackend implements SimulationBackend {
     const count = major.count;
     if (count === 0) return;
 
-    const fill = this.spreadRadius;
-    const radiusX = viewport.width * fill;
-    const radiusY = viewport.height * fill;
-    const radiusZ = Math.min(viewport.width, viewport.height) * 0.375;
+    const radius =
+      Math.hypot(viewport.width, viewport.height) * 0.5 * this.spreadRadius;
+    this.radiusPx = radius;
+
     const centerX = viewport.width / 2;
     const centerY = viewport.height / 2;
     const fresh = major.seed[0] === 0 && major.seed[count - 1] === 0;
+    const shell = 1 - this.spreadVolume;
+    const jitter = 0.05;
 
     for (let i = 0; i < count; i++) {
       fibonacciSphere(i, count, this.sphereVec);
 
-      const sx = centerX + this.sphereVec.x * radiusX;
-      const sy = centerY + this.sphereVec.y * radiusY;
-      const sz = this.sphereVec.z * radiusZ;
+      const dx = this.sphereVec.x + (hash2i(i, 11) - 0.5) * jitter;
+      const dy = this.sphereVec.y + (hash2i(i, 23) - 0.5) * jitter;
+      const dz = this.sphereVec.z + (hash2i(i, 37) - 0.5) * jitter;
+      const length = Math.hypot(dx, dy, dz) || 1;
 
-      major.spreadX[i] = sx;
-      major.spreadY[i] = sy;
-      major.spreadZ[i] = sz;
+      const uniform = Math.cbrt(hash2i(i, 8191));
+      const depth = (shell + (1 - shell) * uniform) * radius;
+      const scale = depth / length;
+
+      major.spreadX[i] = dx * scale;
+      major.spreadY[i] = dy * scale;
+      major.spreadZ[i] = dz * scale;
 
       if (fresh) {
-        major.x[i] = sx;
-        major.y[i] = sy;
-        major.z[i] = sz;
+        major.x[i] = centerX + major.spreadX[i]!;
+        major.y[i] = centerY + major.spreadY[i]!;
+        major.z[i] = major.spreadZ[i]!;
         major.vx[i] = rand(-0.5, 0.5);
         major.vy[i] = rand(-0.5, 0.5);
         major.vz[i] = rand(-0.2, 0.2);
@@ -195,8 +213,8 @@ export class CpuBackend implements SimulationBackend {
       options.transition.assign,
       points,
       major.count,
-      major.spreadX,
-      major.spreadY,
+      major.x,
+      major.y,
       major.shapeX,
       major.shapeY,
       major.shapeZ,
@@ -265,22 +283,27 @@ export class CpuBackend implements SimulationBackend {
     const major = this.major;
     const baseSize = options.major.size * dpr;
     const variation = options.major.sizeVariation;
+    const bias = options.major.sizeBias;
     const twinkleAmount = options.major.twinkle;
     const depthAmount = options.major.depth;
     const spreadInfluence = morph >= 0.2 ? 0 : 1 - morph / 0.2;
     const time = state.time;
-    const depthRange = 1 / Math.max(1, Math.min(width, height) * 0.75);
+    const depthRange = 0.5 / Math.max(1, this.radiusPx);
 
     for (let i = 0; i < major.count; i++) {
       const seed = major.seed[i]!;
       const normalizedZ = major.z[i]! * depthRange + 0.5;
       const depthScale = 1 + (normalizedZ - 0.5) * depthAmount;
-      const sizeJitter = 1 - variation * 0.5 + ((seed % 100) / 100) * variation;
+
+      const sizeRoll = Math.pow(hash2i(i, 4093), bias);
+      const brightRoll = hash2i(i, 9127);
+      const sizeJitter = 1 - variation * 0.5 + sizeRoll * variation;
       const size = baseSize * sizeJitter * (1 + (depthScale - 1) * spreadInfluence);
 
       const twinkle = 1 - twinkleAmount + twinkleAmount * noise2(seed * 0.6, time * 0.0004);
-      const morphedOpacity = 0.9 * twinkle;
-      const spreadOpacity = 0.85 * (0.7 + normalizedZ * 0.3) * major.glow[i]!;
+      const morphedOpacity = 0.92 * twinkle;
+      const brightness = 0.52 + 0.48 * brightRoll * brightRoll;
+      const spreadOpacity = brightness * (0.78 + normalizedZ * 0.22) * major.glow[i]!;
       const opacity = spreadOpacity + (morphedOpacity - spreadOpacity) * morph;
       const alpha = opacity < 0 ? 0 : opacity > 1 ? 255 : (opacity * 255) | 0;
 

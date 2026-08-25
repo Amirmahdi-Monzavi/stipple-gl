@@ -21,7 +21,8 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 | `background` | `string` | `''` | CSS background applied to the canvas. Empty keeps it transparent. |
 | `opacity` | `number` | `1` | Global multiplier over every particle's alpha. |
 | `blend` | `'normal' \| 'additive'` | `'normal'` | `additive` makes overlapping particles glow. Best on dark backgrounds. |
-| `softness` | `number` | `0.55` | Edge falloff of each particle sprite. Lower is sharper, higher is hazier. |
+| `softness` | `number` | `1.35` | Width of the glow halo around each particle. Higher is hazier, lower is tighter. |
+| `core` | `number` | `0.72` | How much of a hard bright centre each particle gets. `0` is pure haze, `1` is a solid dot with a faint halo. |
 | `dpr` | `number \| 'auto'` | `'auto'` | Device pixel ratio. `'auto'` reads `devicePixelRatio`. |
 | `maxDpr` | `number` | `2` | Hard ceiling on DPR. The single biggest performance lever. |
 | `maxFps` | `number` | `0` | Frame cap. `0` disables the cap and runs at display refresh. |
@@ -45,8 +46,9 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 
 | option | type | default | description |
 |---|---|---|---|
-| `size` | `number` | `6.4` | Base sprite diameter in CSS pixels, before DPR. |
-| `sizeVariation` | `number` | `0.6` | Per-particle size spread. `0` makes every particle identical. |
+| `size` | `number` | `6` | Base sprite diameter in CSS pixels, before DPR. |
+| `sizeVariation` | `number` | `0.85` | Per-particle size spread. `0` makes every particle identical. |
+| `sizeBias` | `number` | `1.8` | Skews the size distribution. `1` is uniform; above `1` makes most particles small with a few large, which is what reads as a starfield. |
 | `follow` | `number` | `0.1` | How hard particles chase their target once shaped. Higher is snappier. |
 | `followSpread` | `number` | `0.016` | Same, while dispersed. Low values give a loose floating feel. |
 | `velocity` | `number` | `0.002` | Weight of residual per-particle velocity. |
@@ -62,10 +64,12 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 
 | option | type | default | description |
 |---|---|---|---|
-| `speed` | `number` | `0.012` | Rate the morph scalar approaches its target. |
+| `speed` | `number` | `0.014` | Rate the morph scalar approaches its target. |
 | `easing` | `(t: number) => number` | `easeInOutCubic` | Shapes the interpolation curve. |
 | `assign` | `'angular' \| 'index' \| 'random'` | `'angular'` | How particles are paired with sampled shape points. |
 | `settle` | `number` | `0.1` | Follow strength once fully morphed and undisturbed. |
+| `stagger` | `number` | `0.38` | Spreads particle departure times across the transition, so the shape assembles progressively instead of every particle arriving at once. `0` disables it. |
+| `turbulence` | `number` | `16` | Noise displacement applied to particles while in flight, peaking mid-transition and fading to zero on arrival. |
 
 ### `assign` matters more than it looks
 
@@ -88,13 +92,16 @@ import { easings, easeOutExpo } from 'stipple-gl';
 
 | option | type | default | description |
 |---|---|---|---|
-| `radius` | `number` | `0.6` | Sphere radius as a fraction of the canvas. Above `~0.7` particles spill off the edges. |
+| `radius` | `number` | `0.62` | Sphere radius as a fraction of the canvas half-diagonal. Because density fades toward the edge, values above `1` still look natural. |
 | `flow` | `number` | `0.0015` | Spatial frequency of the noise flow field. Higher is more turbulent. |
 | `breathe` | `number` | `1` | Slow brightness pulsing. `0` disables it. |
-| `zoom` | `number` | `1.45` | Camera zoom while dispersed. Returns to `1` when shaped. |
+| `zoom` | `number` | `1.1` | Camera zoom while dispersed. Returns to `1` when shaped. |
 | `pan` | `{ x, y }` | `{ x: 0.02, y: -0.015 }` | Static camera offset while dispersed. |
 | `drift` | `number` | `0.02` | Speed of the slow automatic camera wander. |
 | `speed` | `number` | `0.01` | How quickly the camera eases toward its target. |
+| `rotation` | `number` | `0.05` | Radians per second the dispersed sphere spins about its vertical axis. Negative reverses it; `0` holds it still. |
+| `tilt` | `number` | `0.16` | Fixed tilt of the spin axis, in radians. Without a tilt the rotation reads as flat. |
+| `volume` | `number` | `1` | `1` distributes particles evenly through the sphere's volume, so density fades smoothly to nothing at the edge. `0` places them on the shell, which produces a visible rim. |
 
 ---
 
@@ -102,14 +109,15 @@ import { easings, easeOutExpo } from 'stipple-gl';
 
 | option | type | default | description |
 |---|---|---|---|
-| `size` | `number` | `3` | Base size. |
+| `size` | `number` | `3.4` | Base size. |
+| `sizeBias` | `number` | `2.4` | Size distribution skew, as with `major.sizeBias`. |
 | `sizeJitter` | `number` | `1` | Per-particle size randomisation. |
-| `sizeScale` | `number` | `1.2` | Multiplier applied at render time. |
+| `sizeScale` | `number` | `1` | Multiplier applied at render time. |
 | `speed` | `number` | `1` | Strength of the noise force. |
 | `turbulence` | `number` | `0.4` | Chaos in the flow field. |
 | `drag` | `number` | `0.99` | Velocity retention. Lower settles faster. |
 | `maxSpeed` | `number` | `0.28` | Hard velocity clamp. |
-| `opacity` | `{ x, y }` | `{ x: 0.35, y: 0.85 }` | Min and max alpha for the flicker range. |
+| `opacity` | `{ x, y }` | `{ x: 0.22, y: 1 }` | Alpha range. The distribution is skewed toward the minimum, so most particles are dim and a few are bright. |
 | `respawnChance` | `number` | `0.0005` | Per-particle chance per frame of teleporting elsewhere. |
 
 ---

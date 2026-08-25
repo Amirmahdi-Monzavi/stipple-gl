@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { assignTargets } from '../src/sources/assign';
-import { mergeOptions, resolveOptions } from '../src/core/options';
+import { defaultOptions, mergeOptions, resolveOptions } from '../src/core/options';
 
 const ring = (count: number, cx: number, cy: number, radius: number): Float32Array => {
   const out = new Float32Array(count * 2);
@@ -155,8 +155,8 @@ describe('mergeOptions', () => {
   it('merges nested groups without dropping siblings', () => {
     const merged = resolveOptions({ major: { size: 12 } });
     expect(merged.major.size).toBe(12);
-    expect(merged.major.follow).toBe(0.1);
-    expect(merged.minor.size).toBe(3);
+    expect(merged.major.follow).toBe(defaultOptions.major.follow);
+    expect(merged.minor.size).toBe(defaultOptions.minor.size);
   });
 
   it('replaces arrays and tuples wholesale', () => {
@@ -168,13 +168,13 @@ describe('mergeOptions', () => {
     const easing = (t: number) => t;
     const merged = resolveOptions({ transition: { easing } });
     expect(merged.transition.easing).toBe(easing);
-    expect(merged.transition.speed).toBe(0.012);
+    expect(merged.transition.speed).toBe(defaultOptions.transition.speed);
   });
 
   it('ignores undefined but honours explicit null', () => {
     const merged = resolveOptions({ minorColor: null, color: undefined });
     expect(merged.minorColor).toBeNull();
-    expect(merged.color).toBe('#4f9c7d');
+    expect(merged.color).toBe(defaultOptions.color);
   });
 
   it('does not mutate the base object', () => {

@@ -42,6 +42,7 @@ export class PointRenderer {
   private uCamScale: WebGLUniformLocation | null = null;
   private uAlpha: WebGLUniformLocation | null = null;
   private uSoftness: WebGLUniformLocation | null = null;
+  private uCore: WebGLUniformLocation | null = null;
   private capacity = 0;
   private arrayBuffer: ArrayBuffer = new ArrayBuffer(0);
 
@@ -61,6 +62,7 @@ export class PointRenderer {
     this.uCamScale = gl.getUniformLocation(this.program, 'uCamScale');
     this.uAlpha = gl.getUniformLocation(this.program, 'uAlpha');
     this.uSoftness = gl.getUniformLocation(this.program, 'uSoftness');
+    this.uCore = gl.getUniformLocation(this.program, 'uCore');
 
     this.vao = gl.createVertexArray();
     this.vbo = gl.createBuffer();
@@ -120,6 +122,7 @@ export class PointRenderer {
     camScale: number,
     alpha: number,
     softness: number,
+    core: number,
   ): void {
     if (vertexCount <= 0 || !this.program) return;
     const gl = this.gl;
@@ -139,6 +142,7 @@ export class PointRenderer {
     gl.uniform1f(this.uCamScale, camScale);
     gl.uniform1f(this.uAlpha, alpha);
     gl.uniform1f(this.uSoftness, softness);
+    gl.uniform1f(this.uCore, core);
 
     gl.drawArrays(gl.POINTS, 0, vertexCount);
     gl.bindVertexArray(null);

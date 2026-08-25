@@ -90,6 +90,16 @@ Systematic sampling with jitter also beats collect-everything-then-shuffle: it i
 
 ---
 
+## The dispersed state
+
+Two details decide whether the dispersed field reads as a cloud or as a flat blob with a hard edge.
+
+**Volume, not shell.** Placing particles on a sphere's *surface* and projecting to 2D piles them up at the silhouette, because the projected density diverges where the surface turns edge-on. The result is a solid disc with a bright rim. Distributing through the *volume* instead — radius scaled by the cube root of a uniform value — gives a projected density that peaks at the centre and falls smoothly to zero, with no boundary at all. `spread.volume` interpolates between the two.
+
+**A sphere, not an ellipse.** Scaling the layout by canvas width and height independently turns the sphere into an ellipse that stretches with the viewport. The radius is a single value derived from the canvas diagonal, so the field stays round at any aspect ratio.
+
+The sphere also rotates. Particle positions are stored in local coordinates centred on the origin and rotated about a tilted vertical axis each frame before the morph blend. Because z drives both point size and brightness, the rotation produces real parallax — particles at the front are larger and brighter than those behind. This is the part a 2D canvas library cannot reproduce.
+
 ## Target assignment
 
 Sampling gives you a bag of points. Deciding *which particle goes to which point* determines whether a morph reads as elegant or as noise.

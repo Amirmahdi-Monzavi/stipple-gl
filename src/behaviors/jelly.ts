@@ -16,8 +16,7 @@ export const createJellyBehavior = (): Behavior => ({
     const disturbed = state.pointer.active || state.shockwaves.length > 0;
     const weight = engaged ? (disturbed ? 0.45 : 1) : 0.06;
 
-    const shortest = Math.min(state.viewport.width, state.viewport.height);
-    const depthRange = 1 / Math.max(1, shortest * 0.375);
+    const depthRange = 2 / Math.max(1, Math.hypot(state.viewport.width, state.viewport.height));
 
     for (let i = 0; i < count; i++) {
       const depth = major.spreadZ[i]! * depthRange + 1;

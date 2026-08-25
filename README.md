@@ -2,7 +2,7 @@
 
 A WebGL2 particle field that morphs into any SVG.
 
-Zero dependencies. Framework agnostic. **13 KB gzipped** for the whole engine.
+Zero dependencies. Framework agnostic. **11.7 KB gzipped** for the engine, 14 KB with the SVG parser and every behaviour.
 
 ```bash
 npm i stipple-gl
@@ -29,7 +29,7 @@ It renders in a **single draw call** with no scene graph, no three.js, and no ru
 
 | | stipple-gl | tsparticles | particles.js |
 |---|---|---|---|
-| gzipped | **13 KB** | 22 KB core · 52 KB full | 8.8 KB |
+| gzipped | **11.7 KB** engine · 14 KB full | 22 KB core · 52 KB full | 8.8 KB |
 | dependencies | **0** | 14 direct (52 packages) | 0 |
 | renderer | **WebGL2** | canvas 2D | canvas 2D |
 | SVG morphing | **built in** | no | no |
@@ -187,6 +187,7 @@ Full option reference: **[docs/options.md](docs/options.md)**.
 - Integer-hash value noise, no trigonometry in the hash.
 - Angular target assignment, so particles take short paths into the shape instead of scrambling across the canvas.
 - SVG sampling rasterises to a bounded bitmap and samples systematically, independent of canvas size or DPR.
+- Volume-distributed rotating sphere, so the dispersed field has depth parallax and no visible boundary.
 - Auto-pauses when scrolled offscreen or when the tab is hidden.
 - Adaptive quality reduces render resolution under frame-budget pressure.
 - Honours `prefers-reduced-motion` by rendering a single static frame.

@@ -14,39 +14,22 @@ import type {
   Viewport,
 } from './types';
 import { CpuBackend } from '../backends/cpu';
-import { sampleShape } from '../sources/sample';
-import { shapeBounds } from '../sources/sample';
+import { sampleShape, shapeBounds } from '../sources/sample';
 
 export type StippleTarget = HTMLElement | HTMLCanvasElement | string;
 
-const MODE_STYLES: Record<RenderMode, Partial<CSSStyleDeclaration>> = {
-  background: {
-    position: 'fixed',
-    inset: '0',
-    width: '100%',
-    height: '100%',
-    display: 'block',
-  },
-  container: {
-    position: 'absolute',
-    inset: '0',
-    width: '100%',
-    height: '100%',
-    display: 'block',
-  },
-  page: {
-    position: 'absolute',
-    top: '0',
-    left: '0',
-    width: '100%',
-    display: 'block',
-  },
+const MODE_POSITION: Record<RenderMode, string> = {
+  background: 'fixed',
+  container: 'absolute',
+  page: 'absolute',
 };
+
+const fail = (message: string): Error => new Error('stipple-gl: ' + message);
 
 const resolveTarget = (target: StippleTarget): HTMLElement => {
   if (typeof target === 'string') {
     const found = document.querySelector<HTMLElement>(target);
-    if (!found) throw new Error('stipple-gl: no element matches selector ' + target);
+    if (!found) throw fail('no element matches selector ' + target);
     return found;
   }
   return target;
@@ -103,7 +86,7 @@ export class Stipple implements StippleInstance {
 
   constructor(target: StippleTarget, config?: StippleConfig) {
     if (typeof window === 'undefined') {
-      throw new Error('stipple-gl: Stipple requires a browser environment');
+      throw fail('Stipple requires a browser environment');
     }
 
     this.opts = resolveOptions(config);
@@ -132,7 +115,7 @@ export class Stipple implements StippleInstance {
     });
 
     if (!gl) {
-      const error = new Error('stipple-gl: WebGL2 is not supported in this browser');
+      const error = fail('WebGL2 is not supported in this browser');
       this.opts.onError?.(error);
       throw error;
     }
@@ -147,6 +130,7 @@ export class Stipple implements StippleInstance {
       dt: 16.667,
       dtScale: 1,
       frame: 0,
+      spin: 0,
       morph: 0,
       targetMorph: 0,
       hasShape: false,
@@ -183,13 +167,23 @@ export class Stipple implements StippleInstance {
 
   private applyCanvasStyle(): void {
     if (!this.ownsCanvas) return;
-    const style = MODE_STYLES[this.opts.mode];
-    Object.assign(this.canvas.style, style);
-    this.canvas.style.pointerEvents = 'none';
+    const mode = this.opts.mode;
+    const style = this.canvas.style;
+    style.position = MODE_POSITION[mode];
+    style.display = 'block';
+    style.width = '100%';
+    style.pointerEvents = 'none';
+    if (mode === 'page') {
+      style.top = '0';
+      style.left = '0';
+    } else {
+      style.inset = '0';
+      style.height = '100%';
+    }
     this.canvas.setAttribute('aria-hidden', 'true');
-    if (this.opts.background) this.canvas.style.background = this.opts.background;
-    if (this.opts.mode === 'page') {
-      this.canvas.style.height = this.pageHeight ? this.pageHeight + 'px' : '100%';
+    if (this.opts.background) style.background = this.opts.background;
+    if (mode === 'page') {
+      style.height = this.pageHeight ? this.pageHeight + 'px' : '100%';
     }
   }
 
@@ -243,19 +237,9 @@ export class Stipple implements StippleInstance {
 
     if (this.opts.pointer.enabled) {
       const surface = this.opts.mode === 'container' ? this.host : window;
-      surface.addEventListener('pointermove', this.onPointerMove as EventListener, {
-        passive: true,
-      });
-      surface.addEventListener('pointerdown', this.onPointerDown as EventListener, {
-        passive: true,
-      });
-      surface.addEventListener('pointerup', this.onPointerUp as EventListener, { passive: true });
-      surface.addEventListener('pointercancel', this.onPointerLeave as EventListener, {
-        passive: true,
-      });
-      surface.addEventListener('pointerleave', this.onPointerLeave as EventListener, {
-        passive: true,
-      });
+      for (const [type, handler] of this.pointerBindings()) {
+        surface.addEventListener(type, handler, { passive: true });
+      }
     }
 
     this.canvas.addEventListener('webglcontextlost', this.onContextLost);
@@ -273,14 +257,22 @@ export class Stipple implements StippleInstance {
     this.motionQuery = null;
 
     const surface = this.opts.mode === 'container' ? this.host : window;
-    surface.removeEventListener('pointermove', this.onPointerMove as EventListener);
-    surface.removeEventListener('pointerdown', this.onPointerDown as EventListener);
-    surface.removeEventListener('pointerup', this.onPointerUp as EventListener);
-    surface.removeEventListener('pointercancel', this.onPointerLeave as EventListener);
-    surface.removeEventListener('pointerleave', this.onPointerLeave as EventListener);
+    for (const [type, handler] of this.pointerBindings()) {
+      surface.removeEventListener(type, handler);
+    }
 
     this.canvas.removeEventListener('webglcontextlost', this.onContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.onContextRestored);
+  }
+
+  private pointerBindings(): Array<[string, EventListener]> {
+    return [
+      ['pointermove', this.onPointerMove as EventListener],
+      ['pointerdown', this.onPointerDown as EventListener],
+      ['pointerup', this.onPointerUp as EventListener],
+      ['pointercancel', this.onPointerLeave as EventListener],
+      ['pointerleave', this.onPointerLeave as EventListener],
+    ];
   }
 
   private onVisibilityChange = (): void => {
@@ -489,6 +481,8 @@ export class Stipple implements StippleInstance {
     state.dtScale = clamp(dt / 16.667, 0.25, 3);
     state.frame++;
 
+    state.spin += (dt / 1000) * this.opts.spread.rotation;
+
     const speed = clamp01(1 - Math.pow(1 - this.opts.transition.speed, state.dtScale));
     state.morph += (state.targetMorph - state.morph) * speed;
     if (Math.abs(state.targetMorph - state.morph) < 0.0005) state.morph = state.targetMorph;
@@ -521,6 +515,7 @@ export class Stipple implements StippleInstance {
       this.camScale,
       this.opts.opacity,
       this.opts.softness,
+      this.opts.core,
     );
   }
 
@@ -560,7 +555,24 @@ export class Stipple implements StippleInstance {
   setOptions(config: StippleConfig): void {
     const previousBlend = this.opts.blend;
     const previousAssign = this.opts.transition.assign;
+    const previousCount = this.opts.count;
+    const previousMinor = this.opts.minorCount;
+    const previousBehaviors = this.opts.behaviors;
+    const previousRadius = this.opts.spread.radius;
+
     this.opts = mergeOptions(this.opts, config);
+
+    if (this.opts.behaviors !== previousBehaviors) {
+      this.backend.init({ gl: this.gl, options: this.opts, viewport: this.viewport });
+    }
+
+    if (this.opts.count !== previousCount || this.opts.minorCount !== previousMinor) {
+      this.backend.reallocate(this.opts.count, this.opts.minorCount, this.viewport);
+      this.renderer.allocate(this.backend.capacity);
+      if (this.shape) this.applyShape(this.shape);
+    } else if (this.opts.spread.radius !== previousRadius) {
+      this.backend.layout(this.viewport);
+    }
 
     if (this.opts.blend !== previousBlend) this.renderer.setBlend(this.opts.blend);
     if (this.opts.background && this.ownsCanvas) {
@@ -575,12 +587,15 @@ export class Stipple implements StippleInstance {
   setCount(count: number, minorCount?: number): void {
     const majors = Math.max(0, Math.floor(count));
     const minors = Math.max(0, Math.floor(minorCount ?? this.opts.minorCount));
-    if (majors === this.opts.count && minors === this.opts.minorCount) return;
+    const backend = this.backend;
 
     this.opts.count = majors;
     this.opts.minorCount = minors;
-    this.backend.reallocate(majors, minors, this.viewport);
-    this.renderer.allocate(this.backend.capacity);
+
+    if (backend.majorCount === majors && backend.minorCount === minors) return;
+
+    backend.reallocate(majors, minors, this.viewport);
+    this.renderer.allocate(backend.capacity);
     if (this.shape) this.applyShape(this.shape);
   }
 

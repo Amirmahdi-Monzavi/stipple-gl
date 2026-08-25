@@ -220,6 +220,7 @@ const serialisableKeys: Array<keyof StippleOptions> = [
   'blend',
   'opacity',
   'softness',
+  'core',
   'maxFps',
   'maxDpr',
   'adaptiveQuality',

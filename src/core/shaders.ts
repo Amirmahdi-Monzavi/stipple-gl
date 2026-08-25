@@ -20,11 +20,16 @@ export const POINT_FRAGMENT_SHADER = `#version 300 es
 precision mediump float;
 in vec4 vColor;
 uniform float uSoftness;
+uniform float uCore;
 out vec4 outColor;
 void main(){
   vec2 p = gl_PointCoord * 2.0 - 1.0;
-  float r = dot(p, p);
-  if (r > 1.0) discard;
-  float alpha = pow(smoothstep(1.0, 0.0, r), uSoftness) * vColor.a;
+  float d2 = dot(p, p);
+  if (d2 >= 1.0) discard;
+  float soft = 1.0 - sqrt(d2);
+  float halo = pow(soft, uSoftness);
+  float core = pow(soft, uSoftness * 4.0);
+  float alpha = min(1.0, halo * (1.0 - uCore) + core * uCore * 2.0) * vColor.a;
+  if (alpha <= 0.003) discard;
   outColor = vec4(vColor.rgb * alpha, alpha);
 }`;

@@ -1,4 +1,4 @@
-import { noise2 } from '../core/math';
+import { hash2i, noise2 } from '../core/math';
 import type { Behavior, SimContext } from '../core/types';
 
 export const createDriftBehavior = (): Behavior => ({
@@ -19,9 +19,9 @@ export const createDriftBehavior = (): Behavior => ({
     const speed = config.speed;
     const sizeBase = config.size;
     const jitter = config.sizeJitter;
+    const bias = config.sizeBias;
     const minOpacity = config.opacity.x;
     const maxOpacity = config.opacity.y;
-    const midOpacity = (minOpacity + maxOpacity) * 0.5;
     const respawn = config.respawnChance;
 
     for (let i = 0; i < count; i++) {
@@ -73,13 +73,17 @@ export const createDriftBehavior = (): Behavior => ({
       minor.vz[i] = minor.vz[i]! * 0.96;
       minor.z[i] = minor.z[i]! + minor.vz[i]!;
 
-      const flicker = 0.08 * (noise2(t * 8, seed) - 0.5);
-      const opacity = midOpacity + flicker;
-      minor.opacity[i] = opacity < minOpacity ? minOpacity : opacity > maxOpacity ? maxOpacity : opacity;
+      const sizeRoll = Math.pow(hash2i(i, 2731), bias);
+      const brightRoll = hash2i(i, 6791);
+
+      const flicker = 0.16 * (noise2(t * 8, seed) - 0.5);
+      const opacity =
+        (minOpacity + (maxOpacity - minOpacity) * brightRoll * brightRoll) * (1 + flicker);
+      minor.opacity[i] = opacity < 0.02 ? 0.02 : opacity > 1 ? 1 : opacity;
 
       const pulsate = 1 + 0.2 * (noise2(state.time * 0.008 + seed, seed + 7.7) - 0.5);
-      const size = (sizeBase + (noise2(seed, seed * 1.7) - 0.5) * 2 * jitter) * pulsate;
-      minor.size[i] = size < 1 ? 1 : size;
+      const size = sizeBase * (0.3 + sizeRoll * (0.7 + jitter)) * pulsate;
+      minor.size[i] = size < 0.6 ? 0.6 : size;
     }
   },
 });

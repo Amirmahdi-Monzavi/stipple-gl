@@ -41,6 +41,7 @@ export interface ShapeConfig {
 export interface MajorOptions {
   size: number;
   sizeVariation: number;
+  sizeBias: number;
   follow: number;
   followSpread: number;
   velocity: number;
@@ -51,6 +52,7 @@ export interface MajorOptions {
 
 export interface MinorOptions {
   size: number;
+  sizeBias: number;
   sizeJitter: number;
   sizeScale: number;
   speed: number;
@@ -77,6 +79,8 @@ export interface TransitionOptions {
   easing: Easing;
   assign: 'angular' | 'index' | 'random';
   settle: number;
+  stagger: number;
+  turbulence: number;
 }
 
 export interface SpreadOptions {
@@ -87,6 +91,9 @@ export interface SpreadOptions {
   pan: XY;
   drift: number;
   speed: number;
+  rotation: number;
+  tilt: number;
+  volume: number;
 }
 
 export interface JellyOptions {
@@ -117,6 +124,7 @@ export interface StippleOptions {
   opacity: number;
   blend: BlendMode;
   softness: number;
+  core: number;
   dpr: number | 'auto';
   maxDpr: number;
   maxFps: number;
@@ -177,6 +185,7 @@ export interface FrameState {
   dt: number;
   dtScale: number;
   frame: number;
+  spin: number;
   morph: number;
   targetMorph: number;
   hasShape: boolean;
@@ -272,6 +281,8 @@ export interface PackTarget {
 export interface SimulationBackend {
   readonly name: string;
   readonly capacity: number;
+  readonly majorCount: number;
+  readonly minorCount: number;
   init(ctx: BackendContext): void;
   reallocate(count: number, minorCount: number, viewport: Viewport): void;
   layout(viewport: Viewport): void;
