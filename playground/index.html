@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>stipple-gl playground</title>
+    <meta
+      name="description"
+      content="Interactive playground for stipple-gl, a WebGL2 particle field that morphs into any SVG."
+    />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <div id="stage" class="stage"></div>
+
+    <header class="masthead">
+      <div class="wordmark">
+        <span class="dot"></span>
+        stipple<span class="muted">-gl</span>
+      </div>
+      <div class="stat" id="stat"></div>
+    </header>
+
+    <aside class="panel" id="panel">
+      <div class="panel-head">
+        <h1>Playground</h1>
+        <button class="ghost" id="toggle-panel" type="button" aria-label="Collapse panel">
+          &minus;
+        </button>
+      </div>
+      <div class="panel-body" id="panel-body"></div>
+      <div class="panel-foot">
+        <button class="primary" id="copy" type="button">Copy config</button>
+        <button class="ghost" id="reset" type="button">Reset</button>
+      </div>
+    </aside>
+
+    <footer class="hint">
+      <span>Drop an SVG file anywhere to morph into it</span>
+      <span class="sep">·</span>
+      <span>Click the shape to send a shockwave</span>
+    </footer>
+
+    <div class="drop-veil" id="drop-veil"><span>Release to morph</span></div>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

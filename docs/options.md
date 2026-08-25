@@ -1,0 +1,162 @@
+# Options reference
+
+Every option is optional. Anything you omit falls back to the default, and nested groups deep-merge — passing `{ major: { size: 8 } }` keeps every other `major` setting intact.
+
+```ts
+new Stipple('#hero', { count: 4000, major: { size: 8 } });
+stipple.setOptions({ jelly: { intensity: 0 } });
+```
+
+---
+
+## Top level
+
+| option | type | default | description |
+|---|---|---|---|
+| `count` | `number` | `3500` | Major (morphing) particles. Set to `0` for an ambient-only field. |
+| `minorCount` | `number` | `260` | Ambient drift particles. These never morph. |
+| `mode` | `'background' \| 'container' \| 'page'` | `'background'` | Canvas positioning and pointer scope. See [Modes](#modes). |
+| `color` | `string` | `'#4f9c7d'` | Hex, `rgb()`, or `rgba()`. Applies to major and emission particles. |
+| `minorColor` | `string \| null` | `null` | Ambient layer colour. `null` inherits `color`. |
+| `background` | `string` | `''` | CSS background applied to the canvas. Empty keeps it transparent. |
+| `opacity` | `number` | `1` | Global multiplier over every particle's alpha. |
+| `blend` | `'normal' \| 'additive'` | `'normal'` | `additive` makes overlapping particles glow. Best on dark backgrounds. |
+| `softness` | `number` | `0.55` | Edge falloff of each particle sprite. Lower is sharper, higher is hazier. |
+| `dpr` | `number \| 'auto'` | `'auto'` | Device pixel ratio. `'auto'` reads `devicePixelRatio`. |
+| `maxDpr` | `number` | `2` | Hard ceiling on DPR. The single biggest performance lever. |
+| `maxFps` | `number` | `0` | Frame cap. `0` disables the cap and runs at display refresh. |
+| `autoPause` | `boolean` | `true` | Stop the loop when the canvas is offscreen or the tab is hidden. |
+| `reducedMotion` | `'respect' \| 'ignore'` | `'respect'` | `respect` renders one static frame when the user prefers reduced motion. |
+| `adaptiveQuality` | `boolean` | `true` | Drop render resolution when frame time exceeds the budget. |
+| `behaviors` | `Behavior[] \| null` | `null` | Replace the simulation pipeline. `null` uses the defaults. |
+| `backend` | `() => SimulationBackend \| null` | `null` | Swap the simulation backend. |
+| `onReady` | `(instance) => void \| null` | `null` | Fires once the instance is constructed. |
+| `onError` | `(error) => void \| null` | `null` | Fires on WebGL2 failure and async shape-loading errors. |
+
+### Modes
+
+- **`background`** — `position: fixed`, covering the viewport. Pointer listeners attach to `window`. Use for full-page hero effects.
+- **`container`** — `position: absolute`, filling the host element. Pointer listeners attach to the host, so multiple instances on one page stay independent. The host needs a non-`static` position and a real height.
+- **`page`** — `position: absolute` at the top of the document, spanning the full page width. Combine with `setPageHeight(px)` to cover a scrolling region taller than the viewport.
+
+---
+
+## `major` — the morphing pool
+
+| option | type | default | description |
+|---|---|---|---|
+| `size` | `number` | `6.4` | Base sprite diameter in CSS pixels, before DPR. |
+| `sizeVariation` | `number` | `0.6` | Per-particle size spread. `0` makes every particle identical. |
+| `follow` | `number` | `0.1` | How hard particles chase their target once shaped. Higher is snappier. |
+| `followSpread` | `number` | `0.016` | Same, while dispersed. Low values give a loose floating feel. |
+| `velocity` | `number` | `0.002` | Weight of residual per-particle velocity. |
+| `damping` | `number` | `0.97` | Velocity retention while morphing. |
+| `twinkle` | `number` | `0.18` | Brightness flicker amplitude when shaped. |
+| `depth` | `number` | `0.8` | How strongly z position scales size and brightness while dispersed. |
+
+`follow` and `followSpread` are frame-rate normalised, so the motion looks the same at 60 Hz and 144 Hz.
+
+---
+
+## `transition` — how the morph moves
+
+| option | type | default | description |
+|---|---|---|---|
+| `speed` | `number` | `0.012` | Rate the morph scalar approaches its target. |
+| `easing` | `(t: number) => number` | `easeInOutCubic` | Shapes the interpolation curve. |
+| `assign` | `'angular' \| 'index' \| 'random'` | `'angular'` | How particles are paired with sampled shape points. |
+| `settle` | `number` | `0.1` | Follow strength once fully morphed and undisturbed. |
+
+### `assign` matters more than it looks
+
+`random` pairs each particle with an arbitrary shape point, so a particle on the left of the sphere may fly to the right of the shape. The result is a scramble.
+
+`angular` sorts both the dispersed particles and the sampled shape points by angle around their centroids, then pairs them in order. Particles travel far shorter distances and the shape snaps into focus instead of churning. For two concentric rings this reaches the mathematically optimal pairing.
+
+`index` pairs by array order — cheapest, and useful when you generate shape points yourself in a meaningful sequence.
+
+Easings ship as named exports:
+
+```ts
+import { easings, easeOutExpo } from 'stipple-gl';
+// linear · inOutCubic · inOutQuad · outExpo · outBack · inOutElastic
+```
+
+---
+
+## `spread` — the dispersed state
+
+| option | type | default | description |
+|---|---|---|---|
+| `radius` | `number` | `0.6` | Sphere radius as a fraction of the canvas. Above `~0.7` particles spill off the edges. |
+| `flow` | `number` | `0.0015` | Spatial frequency of the noise flow field. Higher is more turbulent. |
+| `breathe` | `number` | `1` | Slow brightness pulsing. `0` disables it. |
+| `zoom` | `number` | `1.45` | Camera zoom while dispersed. Returns to `1` when shaped. |
+| `pan` | `{ x, y }` | `{ x: 0.02, y: -0.015 }` | Static camera offset while dispersed. |
+| `drift` | `number` | `0.02` | Speed of the slow automatic camera wander. |
+| `speed` | `number` | `0.01` | How quickly the camera eases toward its target. |
+
+---
+
+## `minor` — the ambient layer
+
+| option | type | default | description |
+|---|---|---|---|
+| `size` | `number` | `3` | Base size. |
+| `sizeJitter` | `number` | `1` | Per-particle size randomisation. |
+| `sizeScale` | `number` | `1.2` | Multiplier applied at render time. |
+| `speed` | `number` | `1` | Strength of the noise force. |
+| `turbulence` | `number` | `0.4` | Chaos in the flow field. |
+| `drag` | `number` | `0.99` | Velocity retention. Lower settles faster. |
+| `maxSpeed` | `number` | `0.28` | Hard velocity clamp. |
+| `opacity` | `{ x, y }` | `{ x: 0.35, y: 0.85 }` | Min and max alpha for the flicker range. |
+| `respawnChance` | `number` | `0.0005` | Per-particle chance per frame of teleporting elsewhere. |
+
+---
+
+## `emission` — sparks
+
+| option | type | default | description |
+|---|---|---|---|
+| `enabled` | `boolean` | `true` | Turn the whole layer off. |
+| `max` | `number` | `140` | Hard cap on live sparks. |
+| `lifespan` | `number` | `62` | Base lifetime. |
+| `speed` | `number` | `0.85` | Initial velocity multiplier. |
+| `rate` | `number` | `0.016` | Spawn probability per sampled source particle per frame. |
+| `burst` | `[number, number]` | `[1, 2]` | Min and max sparks per spawn event. |
+| `spiral` | `number` | `0.0008` | Curl force that makes sparks orbit. |
+| `turbulence` | `number` | `0.003` | Noise applied to spark velocity. |
+
+Emission behaves differently by state: while shaped, sparks drift upward from the figure; while dispersed, they float outward slowly and live much longer.
+
+---
+
+## `pointer` — interaction
+
+| option | type | default | description |
+|---|---|---|---|
+| `enabled` | `boolean` | `true` | Master switch. Disables listener registration entirely. |
+| `radius` | `number` | `150` | Influence radius in CSS pixels. |
+| `force` | `number` | `10` | Repulsion strength. |
+| `falloff` | `number` | `1.6` | Falloff exponent. Higher concentrates the force near the cursor. |
+| `press` | `number` | `1.25` | Force multiplier while the pointer is down. |
+| `shockwave` | `boolean` | `true` | Emit an expanding ring on press. |
+| `shockwaveForce` | `number` | `14` | Ring displacement strength. |
+| `shockwaveSpeed` | `number` | `0.18` | Ring expansion rate in px/ms. |
+| `shockwaveLife` | `number` | `1600` | Ring lifetime in ms. |
+| `shockwaveThickness` | `number` | `110` | Ring band width in px. |
+
+Pointer forces apply only when the field is fully morphed — a dispersed cloud does not react. Hit-testing uses the shape's bounding box, so cost does not scale with particle count.
+
+Fire a wave programmatically with `stipple.pulse(x, y, strength)`.
+
+---
+
+## `jelly` — wobble
+
+| option | type | default | description |
+|---|---|---|---|
+| `intensity` | `number` | `2.4` | Displacement amplitude. `0` freezes the shape solid. |
+| `speed` | `number` | `1.35` | Oscillation rate. |
+
+The wobble is depth-weighted, so particles further back move more, which reads as volume. It damps to 45% while the pointer is active so interaction stays legible.

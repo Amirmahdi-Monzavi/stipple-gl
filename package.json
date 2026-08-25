@@ -1,0 +1,123 @@
+{
+  "name": "stipple-gl",
+  "version": "0.1.0",
+  "description": "GPU-rendered WebGL2 particle field that morphs into any SVG. Zero dependencies, framework agnostic, with a first-class React binding.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Amirmahdi Karen",
+  "keywords": [
+    "webgl",
+    "webgl2",
+    "particles",
+    "particle-system",
+    "svg",
+    "morph",
+    "morphing",
+    "animation",
+    "canvas",
+    "react",
+    "typescript",
+    "stipple"
+  ],
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js",
+      "require": "./dist/react.cjs"
+    },
+    "./scroll": {
+      "types": "./dist/scroll.d.ts",
+      "import": "./dist/scroll.js",
+      "require": "./dist/scroll.cjs"
+    },
+    "./presets": {
+      "types": "./dist/presets.d.ts",
+      "import": "./dist/presets.js",
+      "require": "./dist/presets.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "size": "size-limit",
+    "playground": "vite --config playground/vite.config.ts",
+    "playground:build": "vite build --config playground/vite.config.ts",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
+  },
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@size-limit/preset-small-lib": "^11.2.0",
+    "@types/react": "^19.2.17",
+    "@vitejs/plugin-react": "^6.0.4",
+    "esbuild": "^0.28.2",
+    "jsdom": "^28.0.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "size-limit": "^11.2.0",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.2.0",
+    "vitest": "^4.0.5"
+  },
+  "size-limit": [
+    {
+      "name": "core (full engine, zero deps)",
+      "path": "dist/index.js",
+      "import": "{ Stipple }",
+      "limit": "14 kB"
+    },
+    {
+      "name": "core + react binding",
+      "path": "dist/react.js",
+      "import": "{ Particles }",
+      "limit": "15 kB"
+    },
+    {
+      "name": "scroll module",
+      "path": "dist/scroll.js",
+      "import": "{ createScrollMorph }",
+      "limit": "3 kB"
+    }
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/amirmahdikaren/stipple-gl.git"
+  },
+  "homepage": "https://github.com/amirmahdikaren/stipple-gl#readme",
+  "bugs": {
+    "url": "https://github.com/amirmahdikaren/stipple-gl/issues"
+  }
+}
