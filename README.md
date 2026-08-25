@@ -15,8 +15,7 @@ import { Stipple, shapeFromURL } from 'stipple-gl';
 
 const stipple = new Stipple('#hero');
 
-stipple.setShape(await shapeFromURL('/shield.svg'));
-stipple.setMorph(1);
+await stipple.morphTo(await shapeFromURL('/shield.svg'));
 ```
 
 That's the entire API surface for the common case. Everything else is opt-in.
@@ -152,11 +151,75 @@ Particles disperse as a section leaves the viewport and reassemble into the next
 
 | entry | gzipped | what you get |
 |---|---|---|
-| `stipple-gl/lite` | **9.8 KB** | The engine and the ambient layer. No SVG parser, no morph sampling, no emission, pointer or shockwave behaviours. For a particle background. |
-| `stipple-gl` | **14.8 KB** | Everything: SVG parsing and sampling, angular assignment, all behaviours. |
+| `stipple-gl/lite` | **12.5 KB** | The engine and the ambient layer. No SVG parser, no morph sampling, no emission, pointer or shockwave behaviours. For a particle background. |
+| `stipple-gl` | **19.1 KB** | Everything: SVG parsing and sampling, raster image sources, angular assignment, all behaviours. |
 | `stipple-gl/worker` | +2 KB | The main-thread proxy. The engine itself ships in the worker chunk. |
 
 `stipple-gl/react`, `stipple-gl/scroll` and `stipple-gl/presets` are separate entries too, so you only pay for what you import.
+
+## Any image, not just SVG
+
+Raster decoding goes through the browser, so whatever it can decode, this can sample — PNG, JPEG, WebP, AVIF, GIF, a canvas, even a video frame.
+
+```ts
+import { shapeFromFile, shapeFromImageURL } from 'stipple-gl';
+
+await stipple.morphTo(await shapeFromImageURL('/logo.png'));
+await stipple.morphTo(await shapeFromFile(droppedFile));
+```
+
+`shapeFromFile` picks the strategy. SVG is traced as vector paths, which sample cleanly at any size — unless the markup leans on gradients, filters or stylesheets, which `Path2D` cannot reproduce, in which case it is rasterised so the artwork survives. On the Firefox logo that is the difference between zero colours and 1,269.
+
+A photograph has no alpha to mask with, so use luminance:
+
+```ts
+await shapeFromFile(photo, { mask: 'dark', threshold: 0.45 });
+```
+
+Pair any of it with `color: { type: 'shape' }` and the field takes the source artwork's own palette. See [docs/images.md](docs/images.md).
+
+---
+
+## Drop it in a page
+
+No bundler, no install — the script-tag build puts everything on `window.stipple`.
+
+```html
+<div id="hero" style="height:100vh"></div>
+<script src="https://unpkg.com/stipple-gl"></script>
+<script>
+  const s = stipple.createStipple("#hero");
+  s.morphTo(stipple.shapeFromString(document.querySelector("#logo").outerHTML));
+</script>
+```
+
+---
+
+## Transitions
+
+A move between states is a **choreography**, and there are three places one can run:
+
+```ts
+new Stipple("#hero", {
+  transition: {
+    enter: "sweep",   // spread → shape
+    exit: "mirror",   // shape → spread (reuses enter, gentler)
+    swap: "burst",    // shape → shape
+  },
+});
+```
+
+`uniform`, `sweep` and `burst` are shorthand for full objects you can also write out:
+
+```ts
+transition: {
+  enter: { speed: 0.014, easing: "inOutCubic", stagger: 0.82, order: "x", turbulence: 16 },
+}
+```
+
+`stagger` and `order` are the wipe; `flash` is an optional glow on the wavefront, off by default. `uniform` turns the wipe off entirely. See [docs/options.md](docs/options.md).
+
+---
 
 ## Presets
 
@@ -178,10 +241,15 @@ Each is a plain config object — spread it and override whatever you want.
 
 | method | description |
 |---|---|
-| `setMorph(0…1)` | Move toward dispersed (0) or shaped (1). Transitions smoothly. |
+| `morphTo(shape, options?)` | Set a shape and morph into it. Returns a promise that resolves on arrival, or immediately if a later call supersedes it. |
+| `release()` | Return to the spread, animated. Returns the same kind of promise. |
+| `setMorph(0…1)` | Move toward dispersed (0) or shaped (1). Returns a promise for arrival. |
 | `getMorph()` | Current interpolated value. |
-| `setShape(shape \| null)` | Swap the morph target. `null` disperses. |
+| `setShape(shape | null, choreography?)` | Swap the target without touching the morph value. Returns `false` if the field has no major particles. |
+| `on(event, handler)` | Subscribe to `morphstart`, `morphprogress`, `morphend` or `shapechange`. Returns an unsubscribe function. |
+| `off(event, handler)` | Unsubscribe. |
 | `setOptions(config)` | Deep-merge new options at runtime. |
+| `resetOptions(config?)` | Drop every runtime tweak and rebuild from the defaults. |
 | `setCount(count, minorCount?)` | Resize the particle pools. |
 | `pulse(x, y, strength?)` | Fire a shockwave ring from a point. |
 | `tick(dt?)` | Advance one frame manually, for driving your own loop. |

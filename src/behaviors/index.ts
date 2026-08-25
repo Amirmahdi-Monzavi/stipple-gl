@@ -1,4 +1,6 @@
 import type { Behavior } from '../core/types';
+
+export { PHASE_ORDER, behaviorOrder, sortBehaviors } from '../core/pipeline';
 import { createBreatheBehavior } from './breathe';
 import { createDriftBehavior } from './drift';
 import { createEmissionBehavior } from './emission';

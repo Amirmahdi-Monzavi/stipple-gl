@@ -1,6 +1,8 @@
 import { fibonacciSphere, hash2i, noise2, parseColor, rand } from '../core/math';
-import type { RGB } from '../core/types';
+import type { ColorSpec, RGB } from '../core/types';
 import { packColor } from '../core/renderer';
+import { sortBehaviors } from '../core/pipeline';
+import { resolveChoreography } from '../core/choreography';
 import type {
   BackendContext,
   Behavior,
@@ -38,6 +40,13 @@ const createMajorState = (capacity: number): MajorState => ({
   shapeX: new Float32Array(capacity),
   shapeY: new Float32Array(capacity),
   shapeZ: new Float32Array(capacity),
+  prevShapeX: new Float32Array(capacity),
+  prevShapeY: new Float32Array(capacity),
+  prevShapeZ: new Float32Array(capacity),
+  tint: new Float32Array(capacity),
+  shapeTint: new Uint32Array(capacity),
+  prevShapeTint: new Uint32Array(capacity),
+  hasShapeTint: false,
   hasShape: false,
 });
 
@@ -77,6 +86,24 @@ const createEmissionState = (capacity: number): EmissionState => ({
   b: new Float32Array(capacity),
 });
 
+/** Blend two packed 0x00RRGGBB values. Channels are independent, so mix in place. */
+const mixPacked = (from: number, to: number, t: number): number => {
+  const r = (from & 0xff) + (((to & 0xff) - (from & 0xff)) * t);
+  const g = ((from >> 8) & 0xff) + ((((to >> 8) & 0xff) - ((from >> 8) & 0xff)) * t);
+  const b = ((from >> 16) & 0xff) + ((((to >> 16) & 0xff) - ((from >> 16) & 0xff)) * t);
+  return (r | 0) | ((g | 0) << 8) | ((b | 0) << 16);
+};
+
+/** A ramp or shape spec collapsed to one colour, for the ambient field. */
+const resolveSolid = (spec: Exclude<ColorSpec, string>, fallback: RGB): string =>
+  spec.type === 'ramp' ? spec.from : spec.fallback || packRgbString(fallback);
+
+const packRgbString = (rgb: RGB): string =>
+  '#' +
+  [rgb[0], rgb[1], rgb[2]]
+    .map((c) => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, '0'))
+    .join('');
+
 const colorCache = new Map<string, RGB>();
 
 const cachedColor = (value: string): RGB => {
@@ -99,6 +126,8 @@ export class CpuBackend implements SimulationBackend {
   private behaviors: Behavior[] = [];
   private context: SimContext | null = null;
   private pendingShape: Float32Array | null = null;
+  private pendingColors: Uint32Array | null = null;
+  private sourceOrder = new Uint32Array(0);
   private sphereVec = { x: 0, y: 0, z: 0 };
   private spreadRadius = 0.62;
   private spreadVolume = 1;
@@ -119,8 +148,7 @@ export class CpuBackend implements SimulationBackend {
   init(ctx: BackendContext): void {
     this.spreadRadius = ctx.options.spread.radius;
     this.spreadVolume = ctx.options.spread.volume;
-    const behaviors = ctx.options.behaviors ?? [];
-    this.behaviors = [...behaviors].sort((a, b) => (a.order ?? 50) - (b.order ?? 50));
+    this.behaviors = sortBehaviors(ctx.options.behaviors ?? []);
   }
 
   reallocate(count: number, minorCount: number, viewport: Viewport): void {
@@ -151,10 +179,18 @@ export class CpuBackend implements SimulationBackend {
   precompute(options: StippleOptions): void {
     const major = this.major;
     const majorBias = options.major.sizeBias;
-    const order = options.transition.order;
+    // `enter` owns the launch ordering: it is the move that establishes where
+    // each particle sits in the queue, and exit/swap reuse the same delays so a
+    // wipe reverses along its own path instead of scrambling.
+    const order = resolveChoreography(options.transition.enter).order;
     const radius = this.radiusPx || 1;
+    const count = major.count;
 
-    for (let i = 0; i < major.count; i++) {
+    const ramp = typeof options.color === 'object' && options.color.type === 'ramp'
+      ? options.color.by
+      : null;
+
+    for (let i = 0; i < count; i++) {
       major.sizeRoll[i] = Math.pow(hash2i(i, 4093), majorBias);
       major.brightRoll[i] = hash2i(i, 9127);
 
@@ -164,9 +200,17 @@ export class CpuBackend implements SimulationBackend {
       if (order === 'x') key = (lx / radius + 1) * 0.5;
       else if (order === 'y') key = (ly / radius + 1) * 0.5;
       else if (order === 'radial') key = Math.min(1, Math.hypot(lx, ly) / radius);
-      else if (order === 'angular') key = (Math.atan2(ly, lx) + Math.PI) / (Math.PI * 2);
+      else if (order === 'radar') key = (Math.atan2(ly, lx) + Math.PI) / (Math.PI * 2);
       else key = hash2i(i, 5077);
       major.delay[i] = key < 0 ? 0 : key > 1 ? 1 : key;
+
+      if (ramp) {
+        let t: number;
+        if (ramp === 'depth') t = (major.spreadZ[i]! / radius + 1) * 0.5;
+        else if (ramp === 'radius') t = Math.min(1, Math.hypot(lx, ly) / radius);
+        else t = count > 1 ? i / (count - 1) : 0;
+        major.tint[i] = t < 0 ? 0 : t > 1 ? 1 : t;
+      }
     }
 
     const minor = this.minor;
@@ -244,35 +288,77 @@ export class CpuBackend implements SimulationBackend {
     }
   }
 
-  setShape(points: Float32Array | null, options: StippleOptions): void {
+  setShape(
+    points: Float32Array | null,
+    options: StippleOptions,
+    colors: Uint32Array | null = null,
+    keepPrevious = false,
+  ): void {
     const major = this.major;
 
     if (!points || points.length === 0) {
       major.hasShape = false;
+      major.hasShapeTint = false;
       this.pendingShape = null;
+      this.pendingColors = null;
       return;
     }
 
     const assign = options.shapes?.assign;
     if (!assign) return;
 
+    const count = major.count;
+
+    // Snapshot the outgoing shape so a swap has somewhere to come from.
+    if (keepPrevious && major.hasShape) {
+      major.prevShapeX.set(major.shapeX.subarray(0, count));
+      major.prevShapeY.set(major.shapeY.subarray(0, count));
+      major.prevShapeZ.set(major.shapeZ.subarray(0, count));
+      if (major.hasShapeTint) major.prevShapeTint.set(major.shapeTint.subarray(0, count));
+    }
+
     this.pendingShape = points;
+    this.pendingColors = colors;
+
+    if (this.sourceOrder.length < count) this.sourceOrder = new Uint32Array(count);
+
     assign(
-      options.transition.assign,
+      options.assign,
       points,
-      major.count,
+      count,
       major.x,
       major.y,
       major.shapeX,
       major.shapeY,
       major.shapeZ,
       4,
+      this.sourceOrder,
     );
+
+    if (colors && colors.length > 0) {
+      const available = colors.length;
+      for (let i = 0; i < count; i++) {
+        major.shapeTint[i] = colors[this.sourceOrder[i]! % available]!;
+      }
+      if (!keepPrevious || !major.hasShapeTint) {
+        major.prevShapeTint.set(major.shapeTint.subarray(0, count));
+      }
+      major.hasShapeTint = true;
+    } else {
+      major.hasShapeTint = false;
+    }
+
+    if (!keepPrevious || !major.hasShape) {
+      major.prevShapeX.set(major.shapeX.subarray(0, count));
+      major.prevShapeY.set(major.shapeY.subarray(0, count));
+      major.prevShapeZ.set(major.shapeZ.subarray(0, count));
+    }
+
     major.hasShape = true;
   }
 
   reassign(options: StippleOptions): void {
-    if (this.pendingShape) this.setShape(this.pendingShape, options);
+    if (this.pendingShape) this.setShape(this.pendingShape, options, this.pendingColors);
   }
 
   step(state: FrameState, options: StippleOptions): void {
@@ -309,23 +395,55 @@ export class CpuBackend implements SimulationBackend {
     const invH = 1 / height;
     const morph = state.morph;
 
-    const baseRgb = cachedColor(options.color);
+    const spec = options.color;
+    const solid = typeof spec === 'string';
+    const ramp = !solid && spec.type === 'ramp' ? spec : null;
+    const fromShape = !solid && spec.type === 'shape' ? spec : null;
+
+    const baseRgb = cachedColor(solid ? spec : ramp ? ramp.from : fromShape!.fallback);
+    const rampToRgb = ramp ? cachedColor(ramp.to) : baseRgb;
+
     let majorRgb = baseRgb;
     if (state.shapeColor && morph > 0) {
-      const target = cachedColor(state.shapeColor);
+      const tint = cachedColor(state.shapeColor);
       majorRgb = [
-        baseRgb[0] + (target[0] - baseRgb[0]) * morph,
-        baseRgb[1] + (target[1] - baseRgb[1]) * morph,
-        baseRgb[2] + (target[2] - baseRgb[2]) * morph,
+        baseRgb[0] + (tint[0] - baseRgb[0]) * morph,
+        baseRgb[1] + (tint[1] - baseRgb[1]) * morph,
+        baseRgb[2] + (tint[2] - baseRgb[2]) * morph,
       ];
     }
-    const minorRgb = options.minorColor ? cachedColor(options.minorColor) : baseRgb;
+    const minorSpec = options.minorColor;
+    const minorRgb = minorSpec
+      ? cachedColor(typeof minorSpec === 'string' ? minorSpec : resolveSolid(minorSpec, baseRgb))
+      : baseRgb;
 
     const majorBase = packColor(majorRgb[0], majorRgb[1], majorRgb[2], 0) & 0x00ffffff;
     const minorBase = packColor(minorRgb[0], minorRgb[1], minorRgb[2], 0) & 0x00ffffff;
 
-    const cullX = width + 64;
-    const cullY = height + 64;
+    // Per-particle colour only costs anything when it is actually asked for.
+    const perParticle = ramp !== null || (fromShape !== null && this.major.hasShapeTint);
+    const swapTint = fromShape !== null && this.major.hasShapeTint && state.swapping;
+    const swapMix = state.swap;
+
+    // The shader maps a pixel to clip space as
+    //   ndc = (px / size * 2 - 1) * scale + offset
+    // so the on-screen pixel rect is the inverse of |ndc| <= 1. Culling against
+    // the raw viewport instead would crop the field to a hard rectangle as soon
+    // as the camera zooms out, which is most visible on the top and bottom of
+    // the spread sphere — it is taller than the viewport at the default radius.
+    const { scale, offsetX, offsetY } = state.camera;
+    const safeScale = Math.abs(scale) < 1e-4 ? 1e-4 : scale;
+    const halfW = width * 0.5;
+    const halfH = height * 0.5;
+    const spanX = halfW / safeScale;
+    const spanY = halfH / safeScale;
+    const centerX = halfW - (offsetX * halfW) / safeScale;
+    const centerY = halfH + (offsetY * halfH) / safeScale;
+
+    const minX = centerX - spanX - 64;
+    const maxX = centerX + spanX + 64;
+    const minY = centerY - spanY - 64;
+    const maxY = centerY + spanY + 64;
 
     let offset = 0;
 
@@ -334,7 +452,7 @@ export class CpuBackend implements SimulationBackend {
     for (let i = 0; i < minor.count; i++) {
       const x = minor.x[i]!;
       const y = minor.y[i]!;
-      if (x < -64 || x > cullX || y < -64 || y > cullY) continue;
+      if (x < minX || x > maxX || y < minY || y > maxY) continue;
 
       const o = offset * 4;
       floats[o] = x * invW;
@@ -356,7 +474,7 @@ export class CpuBackend implements SimulationBackend {
     for (let i = 0; i < major.count; i++) {
       const x = major.x[i]!;
       const y = major.y[i]!;
-      if (x < -64 || x > cullX || y < -64 || y > cullY) continue;
+      if (x < minX || x > maxX || y < minY || y > maxY) continue;
 
       const seed = major.seed[i]!;
       const normalizedZ = major.z[i]! * depthRange + 0.5;
@@ -376,11 +494,30 @@ export class CpuBackend implements SimulationBackend {
       opacity += flash * 0.75;
       const alpha = opacity < 0 ? 0 : opacity > 1 ? 255 : (opacity * 255) | 0;
 
+      let rgb = majorBase;
+      if (perParticle) {
+        if (ramp) {
+          const t = major.tint[i]!;
+          rgb =
+            packColor(
+              baseRgb[0] + (rampToRgb[0] - baseRgb[0]) * t,
+              baseRgb[1] + (rampToRgb[1] - baseRgb[1]) * t,
+              baseRgb[2] + (rampToRgb[2] - baseRgb[2]) * t,
+              0,
+            ) & 0x00ffffff;
+        } else {
+          const to = major.shapeTint[i]!;
+          const sampled = swapTint ? mixPacked(major.prevShapeTint[i]!, to, swapMix) : to;
+          // Fade from the spread colour into the SVG's own colour as it forms.
+          rgb = morph >= 1 ? sampled : mixPacked(majorBase, sampled, morph);
+        }
+      }
+
       const o = offset * 4;
       floats[o] = x * invW;
       floats[o + 1] = y * invH;
       floats[o + 2] = size;
-      colors[o + 3] = majorBase | (alpha << 24);
+      colors[o + 3] = rgb | (alpha << 24);
       offset++;
     }
 
@@ -388,7 +525,7 @@ export class CpuBackend implements SimulationBackend {
     for (let i = 0; i < emission.count; i++) {
       const x = emission.x[i]!;
       const y = emission.y[i]!;
-      if (x < -64 || x > cullX || y < -64 || y > cullY) continue;
+      if (x < minX || x > maxX || y < minY || y > maxY) continue;
 
       const o = offset * 4;
       floats[o] = x * invW;

@@ -17,6 +17,7 @@ const result = await build({
   metafile: true,
   external: ['react', 'react-dom'],
   target: 'es2022',
+  define: { 'process.env.NODE_ENV': '"production"' },
 });
 
 const out = Object.values(result.metafile.outputs)[0];

@@ -1,7 +1,10 @@
 import { clamp, clamp01 } from './math';
-import { mergeOptions } from './options';
+import { defaultOptions, mergeOptions } from './options';
+import { baseChoreography, mirrorChoreography, resolveChoreography } from './choreography';
 import { PointRenderer } from './renderer';
 import type {
+  ChoreographyConfig,
+  Choreography,
   FrameState,
   PointerState,
   ShapeConfig,
@@ -19,6 +22,9 @@ export type RuntimeSurface = HTMLCanvasElement | OffscreenCanvas;
 
 export interface RuntimeCallbacks {
   onResolutionChange?(viewport: Viewport): void;
+  onMorphProgress?(value: number): void;
+  onMorphSettled?(value: number): void;
+  onSwapEnd?(): void;
 }
 
 export class Runtime {
@@ -35,12 +41,12 @@ export class Runtime {
   shape: ShapeConfig | null = null;
   readonly shapeBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
+  /** Per-call override from `setShape`, cleared when the swap finishes. */
+  private swapChoreography: Choreography | null = null;
+
   quality = 1;
   degenerate = true;
 
-  private camScale = 1;
-  private camOffsetX = 0;
-  private camOffsetY = 0;
   private spreadPhase = 0;
 
   private frameAccumulator = 0;
@@ -85,7 +91,17 @@ export class Runtime {
       viewport: this.viewport,
       pointer: this.pointer,
       shockwaves: this.shockwaves,
+      camera: { scale: 1, offsetX: 0, offsetY: 0 },
+      swap: 1,
+      swapping: false,
+      choreo: {
+        enter: baseChoreography,
+        exit: baseChoreography,
+        swap: null,
+      },
     };
+
+    this.refreshChoreography();
 
     this.backend.init({ gl, options, viewport: this.viewport });
   }
@@ -131,7 +147,7 @@ export class Runtime {
     this.renderer.allocate(this.backend.capacity);
   }
 
-  applyShape(shape: ShapeConfig): void {
+  applyShape(shape: ShapeConfig, swap = false): void {
     if (this.degenerate) return;
 
     const shapes = this.opts.shapes;
@@ -143,35 +159,95 @@ export class Runtime {
     }
 
     const count = Math.min(shape.count ?? this.opts.count, this.opts.count);
-    const points = shapes.sample(shape, count, this.viewport.width, this.viewport.height);
+    const sampled = shapes.sample(shape, count, this.viewport.width, this.viewport.height);
 
-    if (points.length === 0) {
+    if (sampled.points.length === 0) {
       this.backend.setShape(null, this.opts);
       this.state.hasShape = false;
       this.state.shapeColor = null;
       return;
     }
 
-    const bounds = shapes.bounds(points);
+    const bounds = shapes.bounds(sampled.points);
     this.shapeBox.minX = bounds.minX;
     this.shapeBox.minY = bounds.minY;
     this.shapeBox.maxX = bounds.maxX;
     this.shapeBox.maxY = bounds.maxY;
 
-    this.backend.setShape(points, this.opts);
+    this.backend.setShape(sampled.points, this.opts, sampled.colors, swap);
     this.state.hasShape = true;
     this.state.shapeColor = shape.color ?? null;
   }
 
-  setShape(shape: ShapeConfig | null): void {
+  /**
+   * Install a shape. Returns false when the request could not be honoured —
+   * currently only when the field has no major particles to arrange.
+   */
+  setShape(shape: ShapeConfig | null, choreography?: ChoreographyConfig | 'none'): boolean {
+    const had = this.state.hasShape;
     this.shape = shape;
-    if (!shape || shape.paths.length === 0) {
+
+    // A raster-backed shape carries no paths, so emptiness has to consider both.
+    if (!shape || (shape.paths.length === 0 && !shape.image)) {
       this.backend.setShape(null, this.opts);
       this.state.hasShape = false;
       this.state.shapeColor = null;
-      return;
+      this.state.swapping = false;
+      return true;
     }
-    this.applyShape(shape);
+
+    if (this.opts.count === 0) {
+      this.opts.onError?.(
+        fail(
+          'setShape was ignored: this configuration has no major particles (count is 0). ' +
+            'Ambient presets like starfield and dust cannot form a shape.',
+        ),
+      );
+      return false;
+    }
+
+    // A swap only makes sense when a shape is already on screen and the field is
+    // actually showing it. Otherwise this is a plain enter and the sphere is the
+    // starting point.
+    const resolved =
+      choreography === undefined
+        ? this.opts.transition.swap
+        : choreography;
+    const wantsSwap = resolved !== 'none';
+    const swapping = wantsSwap && had && this.state.morph > 0.02;
+
+    this.applyShape(shape, swapping);
+
+    if (swapping) {
+      this.state.swap = 0;
+      this.state.swapping = true;
+      this.swapChoreography =
+        choreography !== undefined && choreography !== 'none'
+          ? resolveChoreography(choreography, this.state.choreo.enter)
+          : null;
+      this.refreshChoreography();
+    } else {
+      this.state.swap = 1;
+      this.state.swapping = false;
+      this.swapChoreography = null;
+    }
+
+    return true;
+  }
+
+  /** Recompute the resolved choreographies. Cheap, and only on option changes. */
+  refreshChoreography(): void {
+    const transition = this.opts.transition;
+    const enter = resolveChoreography(transition.enter);
+    const exit =
+      transition.exit === 'mirror'
+        ? mirrorChoreography(enter)
+        : resolveChoreography(transition.exit, enter);
+    const swap =
+      this.swapChoreography ??
+      (transition.swap === 'none' ? null : resolveChoreography(transition.swap, enter));
+
+    this.state.choreo = { enter, exit, swap };
   }
 
   setOptions(config: StippleConfig): void {
@@ -179,11 +255,27 @@ export class Runtime {
     this.opts = mergeOptions(this.opts, config);
     const next = this.opts;
 
+    // `behaviors`, `shapes` and `backend` are capabilities injected once at
+    // construction (by `Stipple`, or by the worker thread), and they all default
+    // to `null`. Any config built from `defaultOptions` — every preset switch,
+    // for instance — carries those nulls, which would silently tear the engine
+    // down: an empty behaviour pipeline freezes the field, and a missing sampler
+    // makes `setShape` a no-op. Treat `null` here as "unspecified", not "remove".
+    // Pass an explicit `[]` to genuinely run no behaviours.
+    if (next.behaviors === null) next.behaviors = before.behaviors;
+    if (next.shapes === null) next.shapes = before.shapes;
+    if (next.backend === null) next.backend = before.backend;
+
     if (next.behaviors !== before.behaviors) {
       this.backend.init({ gl: this.gl, options: next, viewport: this.viewport });
     }
 
     if (next.blend !== before.blend) this.renderer.setBlend(next.blend);
+
+    if (next.transition !== before.transition) this.refreshChoreography();
+
+    const orderChanged =
+      this.state.choreo.enter.order !== resolveChoreography(before.transition.enter).order;
 
     if (next.count !== before.count || next.minorCount !== before.minorCount) {
       this.allocate();
@@ -195,16 +287,36 @@ export class Runtime {
       this.backend.layout(this.viewport);
       this.backend.precompute(next);
     } else if (
-      next.transition.order !== before.transition.order ||
+      orderChanged ||
+      next.color !== before.color ||
       next.major.sizeBias !== before.major.sizeBias ||
       next.minor.sizeBias !== before.minor.sizeBias
     ) {
       this.backend.precompute(next);
     }
 
-    if (next.transition.assign !== before.transition.assign && this.shape) {
+    if (next.assign !== before.assign && this.shape) {
       this.applyShape(this.shape);
     }
+  }
+
+  /**
+   * Drop every runtime tweak and rebuild from the defaults, keeping the
+   * capabilities that were injected at construction and the shape on screen.
+   */
+  resetOptions(config?: StippleConfig): void {
+    const { behaviors, shapes, backend, onReady, onError } = this.opts;
+
+    this.setOptions({ ...(defaultOptions as StippleConfig), ...config });
+
+    // `mergeOptions` deep-clones plain objects, which would hand back a *copy* of
+    // the sampler rather than the sampler itself. Capabilities are identities,
+    // not values, so they are restored directly.
+    this.opts.behaviors = behaviors;
+    this.opts.shapes = shapes;
+    this.opts.backend = backend;
+    this.opts.onReady = onReady;
+    this.opts.onError = onError;
   }
 
   setCount(count: number, minorCount?: number): void {
@@ -245,9 +357,37 @@ export class Runtime {
     state.frame++;
     state.spin += (dt / 1000) * this.opts.spread.rotation;
 
-    const speed = clamp01(1 - Math.pow(1 - this.opts.transition.speed, state.dtScale));
+    // Entering and leaving are separate moves with separate rates, so the one in
+    // force depends on which way the morph is heading.
+    const previousMorph = state.morph;
+    const moving = state.targetMorph < state.morph ? state.choreo.exit : state.choreo.enter;
+    const speed = clamp01(1 - Math.pow(1 - moving.speed, state.dtScale));
     state.morph += (state.targetMorph - state.morph) * speed;
     if (Math.abs(state.targetMorph - state.morph) < 0.0005) state.morph = state.targetMorph;
+
+    // A swap advances on its own clock and finishes independently of the morph.
+    if (state.swapping) {
+      const swapChoreo = state.choreo.swap;
+      if (!swapChoreo) {
+        state.swap = 1;
+        state.swapping = false;
+      } else {
+        const swapSpeed = clamp01(1 - Math.pow(1 - swapChoreo.speed, state.dtScale));
+        state.swap += (1 - state.swap) * swapSpeed;
+        if (state.swap > 0.9995) {
+          state.swap = 1;
+          state.swapping = false;
+          this.swapChoreography = null;
+          this.refreshChoreography();
+          this.callbacks.onSwapEnd?.();
+        }
+      }
+    }
+
+    if (state.morph !== previousMorph) {
+      this.callbacks.onMorphProgress?.(state.morph);
+      if (state.morph === state.targetMorph) this.callbacks.onMorphSettled?.(state.morph);
+    }
 
     const life = this.opts.pointer.shockwaveLife;
     for (let i = this.shockwaves.length - 1; i >= 0; i--) {
@@ -275,9 +415,10 @@ export class Runtime {
       targetY = (Math.cos(this.spreadPhase * 0.9) * 0.1 + spread.pan.y) * 0.25;
     }
 
-    this.camScale += (targetScale - this.camScale) * speed;
-    this.camOffsetX += (targetX - this.camOffsetX) * speed;
-    this.camOffsetY += (targetY - this.camOffsetY) * speed;
+    const camera = this.state.camera;
+    camera.scale += (targetScale - camera.scale) * speed;
+    camera.offsetX += (targetX - camera.offsetX) * speed;
+    camera.offsetY += (targetY - camera.offsetY) * speed;
   }
 
   render(): void {
@@ -290,9 +431,9 @@ export class Runtime {
     this.renderer.clear();
     this.renderer.draw(
       count,
-      this.camOffsetX,
-      this.camOffsetY,
-      this.camScale,
+      this.state.camera.offsetX,
+      this.state.camera.offsetY,
+      this.state.camera.scale,
       this.opts.opacity,
       this.opts.softness,
       this.opts.core,

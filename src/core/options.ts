@@ -1,4 +1,3 @@
-import { easeInOutCubic } from './math';
 import type { StippleConfig, StippleOptions } from './types';
 
 export const defaultOptions: StippleOptions = {
@@ -28,6 +27,7 @@ export const defaultOptions: StippleOptions = {
     damping: 0.97,
     twinkle: 0.18,
     depth: 0.8,
+    settle: 0.1,
   },
   minor: {
     size: 3.4,
@@ -51,16 +51,11 @@ export const defaultOptions: StippleOptions = {
     spiral: 0.0008,
     turbulence: 0.003,
   },
+  assign: 'angular',
   transition: {
-    speed: 0.014,
-    easing: easeInOutCubic,
-    assign: 'angular',
-    settle: 0.1,
-    stagger: 0.38,
-    order: 'radial',
-    sweep: 0.9,
-    sweepWidth: 0.22,
-    turbulence: 16,
+    enter: 'sweep',
+    exit: 'mirror',
+    swap: 'sweep',
   },
   spread: {
     radius: 0.62,

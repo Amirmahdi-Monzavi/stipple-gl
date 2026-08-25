@@ -1,4 +1,4 @@
-import type { ShapeConfig, StippleConfig } from '../core/types';
+import type { ChoreographyConfig, ShapeConfig, StippleConfig } from '../core/types';
 
 export interface SerialViewport {
   width: number;
@@ -17,8 +17,13 @@ export type MainToWorker =
   | { type: 'init'; canvas: OffscreenCanvas; config: StippleConfig; viewport: SerialViewport }
   | { type: 'resize'; viewport: SerialViewport }
   | { type: 'morph'; value: number }
-  | { type: 'shape'; shape: ShapeConfig | null }
+  | {
+      type: 'shape';
+      shape: ShapeConfig | null;
+      choreography?: ChoreographyConfig | 'none' | undefined;
+    }
   | { type: 'options'; config: StippleConfig }
+  | { type: 'reset'; config: StippleConfig }
   | { type: 'count'; count: number; minorCount: number }
   | { type: 'pointer'; x: number; y: number; active: boolean; down: boolean }
   | { type: 'pulse'; x: number; y: number; strength: number }
@@ -28,6 +33,7 @@ export type MainToWorker =
 export type WorkerToMain =
   | { type: 'ready' }
   | { type: 'stats'; fps: number; morph: number; hasShape: boolean; box: ShapeBox }
+  | { type: 'morphsettled'; value: number }
   | { type: 'error'; message: string };
 
 const TRANSFERABLE_KEYS = new Set(['behaviors', 'backend', 'shapes', 'onReady', 'onError']);
@@ -62,4 +68,20 @@ export const sanitizeConfig = (config: StippleConfig | undefined): StippleConfig
   };
 
   return (clone(config ?? {}, '') as StippleConfig) ?? {};
+};
+
+/**
+ * A choreography can carry an easing function, which `postMessage` cannot clone.
+ * Names survive; functions are dropped so the worker falls back to its default.
+ */
+export const sanitizeChoreography = (
+  choreography: ChoreographyConfig | 'none' | undefined,
+): ChoreographyConfig | 'none' | undefined => {
+  if (choreography === undefined || typeof choreography === 'string') return choreography;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(choreography)) {
+    if (typeof value === 'function') continue;
+    out[key] = value;
+  }
+  return out as ChoreographyConfig;
 };

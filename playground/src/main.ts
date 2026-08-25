@@ -1,8 +1,9 @@
-import { Stipple, defaultOptions, mergeOptions, shapeFromString } from 'stipple-gl';
+import { Stipple, defaultOptions, mergeOptions, shapeFromFile, shapeFromString } from 'stipple-gl';
 import { presets } from 'stipple-gl/presets';
 import type { ShapeConfig, StippleConfig, StippleInstance, StippleOptions } from 'stipple-gl';
 import { WorkerStipple } from 'stipple-gl/worker';
 
+import { mirrorChoreography, resolveChoreography } from 'stipple-gl';
 import { buildPanel, controlGroups } from './controls';
 import { shapeNames, shapes } from './shapes';
 
@@ -12,17 +13,28 @@ const panelBody = document.getElementById('panel-body')!;
 const statEl = document.getElementById('stat')!;
 const dropVeil = document.getElementById('drop-veil')!;
 
+// The panel binds to paths like transition.enter.speed, so the playground works
+// in fully expanded choreographies rather than the shorthand names.
 const baseConfig: StippleConfig = {
   ...presets.morph,
   mode: 'background',
   count: 6000,
   minorCount: 320,
+  transition: {
+    enter: resolveChoreography(presets.morph.transition?.enter),
+    exit: mirrorChoreography(resolveChoreography(presets.morph.transition?.enter)),
+    swap: resolveChoreography(
+      presets.morph.transition?.swap === 'none' ? undefined : presets.morph.transition?.swap,
+    ),
+  },
 };
 
 let config: StippleOptions = mergeOptions(defaultOptions, baseConfig);
 let activeShape = 'shield';
 let customShape: ShapeConfig | null = null;
 let morphTarget = 1;
+let detail: 'uniform' | 'edges' | 'density' = 'uniform';
+let detailStrength = 0.85;
 
 const useWorker = new URLSearchParams(location.search).has('worker');
 
@@ -60,32 +72,46 @@ const toast = (message: string): void => {
   }, 1900);
 };
 
+// Detail is a property of the shape, not a runtime option, so changing it means
+// re-sampling. Kept here so every shape the playground builds picks it up.
+const withDetail = (shape: ShapeConfig): ShapeConfig => ({ ...shape, detail, detailStrength });
+
+const reapplyShape = (): void => {
+  if (customShape) instance.setShape(withDetail(customShape));
+  else if (activeShape && activeShape !== 'none') applyShape(activeShape);
+};
+
 const applyShape = (name: string): void => {
   activeShape = name;
   customShape = null;
 
   if (name === 'none') {
-    instance.setShape(null);
-    instance.setMorph(0);
+    // release() keeps the shape so the exit choreography has somewhere to
+    // travel from. setShape(null) would clear it and skip the animation.
+    void instance.release();
     return;
   }
 
   const source = shapes[name];
   if (!source) return;
 
-  instance.setShape(shapeFromString(source, { scale: 0.62, position: { x: 0.5, y: 0.5 } }));
-  instance.setMorph(morphTarget);
+  const shape = withDetail(shapeFromString(source, { scale: 0.62, position: { x: 0.5, y: 0.5 } }));
+  if (morphTarget >= 1) {
+    void instance.morphTo(shape);
+  } else {
+    instance.setShape(shape);
+    void instance.setMorph(morphTarget);
+  }
 };
 
-const applyCustomShape = (source: string, label: string): void => {
+const applyCustomShape = async (file: File): Promise<void> => {
   try {
-    const shape = shapeFromString(source, { scale: 0.62, position: { x: 0.5, y: 0.5 } });
+    const shape = withDetail(await shapeFromFile(file, { scale: 0.62, position: { x: 0.5, y: 0.5 } }));
     customShape = shape;
     activeShape = '';
-    instance.setShape(shape);
-    instance.setMorph(morphTarget);
+    void instance.morphTo(shape);
     renderShapeChips();
-    toast('Morphing into ' + label);
+    toast('Morphing into ' + file.name + (shape.image ? ' (rasterised)' : ' (vector)'));
   } catch (error) {
     toast((error as Error).message);
   }
@@ -123,6 +149,47 @@ morphInput.addEventListener('input', () => {
 });
 morphRow.append(morphLabel, morphValue, morphInput);
 shapeBody.appendChild(morphRow);
+
+// Detail weighting. Flat-filled artwork spends most of its particles on
+// featureless interior; this moves the budget to where the picture is.
+const detailRow = document.createElement("div");
+detailRow.className = "row";
+const detailLabel = document.createElement("label");
+detailLabel.textContent = "Detail";
+const detailSelect = document.createElement("select");
+for (const value of ["uniform", "edges", "density"]) {
+  const option = document.createElement("option");
+  option.value = value;
+  option.textContent = value;
+  detailSelect.appendChild(option);
+}
+detailSelect.addEventListener("change", () => {
+  detail = detailSelect.value as typeof detail;
+  reapplyShape();
+});
+detailRow.append(detailLabel, detailSelect);
+shapeBody.appendChild(detailRow);
+
+const strengthRow = document.createElement("div");
+strengthRow.className = "row";
+const strengthLabel = document.createElement("label");
+strengthLabel.textContent = "Detail strength";
+const strengthValue = document.createElement("span");
+strengthValue.className = "value";
+strengthValue.textContent = "0.85";
+const strengthInput = document.createElement("input");
+strengthInput.type = "range";
+strengthInput.min = "0";
+strengthInput.max = "1";
+strengthInput.step = "0.05";
+strengthInput.value = "0.85";
+strengthInput.addEventListener("input", () => {
+  detailStrength = Number(strengthInput.value);
+  strengthValue.textContent = detailStrength.toFixed(2);
+  reapplyShape();
+});
+strengthRow.append(strengthLabel, strengthValue, strengthInput);
+shapeBody.appendChild(strengthRow);
 
 shapeSection.append(shapeSummary, shapeBody);
 panelBody.appendChild(shapeSection);
@@ -177,6 +244,7 @@ const applyPreset = (name: keyof typeof presets): void => {
     instance.setShape(null);
     activeShape = 'none';
     renderShapeChips();
+    toast(name + ' is an ambient preset — it has no particles to form a shape');
   }
 };
 
@@ -243,6 +311,7 @@ const serialisableKeys: Array<keyof StippleOptions> = [
   'major',
   'minor',
   'emission',
+  'assign',
   'transition',
   'spread',
   'jelly',
@@ -254,9 +323,18 @@ document.getElementById('copy')!.addEventListener('click', () => {
   for (const key of serialisableKeys) {
     const value = config[key];
     if (key === 'transition') {
-      const { easing, ...rest } = config.transition;
-      void easing;
-      output[key] = rest;
+      // Easing can be a function, which JSON cannot carry. Names survive.
+      const slots = config.transition as unknown as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const [slot, value] of Object.entries(slots)) {
+        if (typeof value !== 'object' || value === null) {
+          out[slot] = value;
+          continue;
+        }
+        const { easing, ...rest } = value as Record<string, unknown>;
+        out[slot] = typeof easing === 'function' ? rest : { ...rest, easing };
+      }
+      output[key] = out;
       continue;
     }
     output[key] = value;
@@ -293,12 +371,13 @@ window.addEventListener('drop', (event) => {
   const file = event.dataTransfer?.files?.[0];
   if (!file) return;
 
-  if (!file.name.toLowerCase().endsWith('.svg') && file.type !== 'image/svg+xml') {
-    toast('That is not an SVG file');
+  const isSVG = /.svg$/i.test(file.name) || /svg/i.test(file.type);
+  if (!isSVG && !file.type.startsWith('image/')) {
+    toast('Drop an SVG, PNG, JPEG, WebP, AVIF or GIF');
     return;
   }
 
-  void file.text().then((source) => applyCustomShape(source, file.name));
+  void applyCustomShape(file);
 });
 
 let lastStat = 0;

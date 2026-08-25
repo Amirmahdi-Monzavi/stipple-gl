@@ -191,6 +191,20 @@ export const buildPanel = (
   };
 };
 
+/** The same seven knobs for each of the three transition slots. */
+export const choreographyControls = (slot: 'enter' | 'exit' | 'swap'): ControlSpec[] => {
+  const at = (key: string) => 'transition.' + slot + '.' + key;
+  return [
+    { kind: 'slider', path: at('speed'), label: 'Speed', min: 0.002, max: 0.12, step: 0.002, format: (v) => v.toFixed(3) },
+    { kind: 'select', path: at('easing'), label: 'Easing', choices: ['linear', 'inOutCubic', 'inOutQuad', 'outExpo', 'outBack', 'inOutElastic'] },
+    { kind: 'select', path: at('order'), label: 'Wavefront direction', choices: ['x', 'y', 'radial', 'radar', 'random'] },
+    { kind: 'slider', path: at('stagger'), label: 'Wavefront spread', min: 0, max: 0.9, step: 0.02, format: (v) => v.toFixed(2) },
+    { kind: 'slider', path: at('turbulence'), label: 'Flight turbulence', min: 0, max: 80, step: 1 },
+    { kind: 'slider', path: at('flash'), label: 'Wavefront flash', min: 0, max: 1, step: 0.05, format: (v) => v.toFixed(2) },
+    { kind: 'slider', path: at('flashWidth'), label: 'Flash width', min: 0.02, max: 0.6, step: 0.02, format: (v) => v.toFixed(2) },
+  ];
+};
+
 export const controlGroups: ControlGroup[] = [
   {
     name: 'Field',
@@ -279,42 +293,12 @@ export const controlGroups: ControlGroup[] = [
       },
     ],
   },
+  { name: 'Morph in (spread to shape)', open: true, controls: choreographyControls('enter') },
+  { name: 'Morph out (shape to spread)', controls: choreographyControls('exit') },
+  { name: 'Shape swap (shape to shape)', controls: choreographyControls('swap') },
   {
-    name: 'Morph',
-    open: true,
+    name: 'Morph settling',
     controls: [
-      {
-        kind: 'slider',
-        path: 'transition.speed',
-        label: 'Transition speed',
-        min: 0.002,
-        max: 0.12,
-        step: 0.002,
-        format: (v) => v.toFixed(3),
-      },
-      {
-        kind: 'select',
-        path: 'transition.assign',
-        label: 'Target assignment',
-        choices: ['angular', 'index', 'random'],
-      },
-      {
-        kind: 'slider',
-        path: 'transition.stagger',
-        label: 'Stagger',
-        min: 0,
-        max: 0.9,
-        step: 0.02,
-        format: (v) => v.toFixed(2),
-      },
-      {
-        kind: 'slider',
-        path: 'transition.turbulence',
-        label: 'Flight turbulence',
-        min: 0,
-        max: 80,
-        step: 1,
-      },
       {
         kind: 'slider',
         path: 'major.follow',

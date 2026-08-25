@@ -196,30 +196,107 @@ export const shapeElementToPath = (element: Element): string | null => {
 const SHAPE_SELECTOR = 'path,circle,ellipse,rect,line,polyline,polygon';
 const SKIP_TAGS = new Set(['defs', 'clippath', 'mask', 'style', 'title', 'desc', 'metadata']);
 
-const collect = (root: Element, inherited: Matrix, out: SVGPathData[]): void => {
+/** Presentation attributes that cascade from an ancestor to its children. */
+interface Painted {
+  fill: string | null;
+  stroke: string | null;
+  strokeWidth: string | null;
+  fillRule: string | null;
+}
+
+const STYLE_DECL = /([\w-]+)\s*:\s*([^;]+)/g;
+
+/** Read one property from a `style` attribute. Inline style beats the attribute. */
+const styleProp = (style: string | null, property: string): string | null => {
+  if (!style) return null;
+  STYLE_DECL.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let found: string | null = null;
+  while ((match = STYLE_DECL.exec(style)) !== null) {
+    if (match[1]!.toLowerCase() === property) found = match[2]!.trim();
+  }
+  return found;
+};
+
+/**
+ * Resolve an element's painted state against what it inherits.
+ *
+ * SVG presentation attributes cascade, and `style` wins over the attribute of
+ * the same name. Reading only `getAttribute('fill')` off the element misses
+ * both, which is why an icon that sets `fill="none"` once on the root — the
+ * overwhelmingly common shape of a stroked icon — used to come out filled, and
+ * an outline path filled is a blob rather than a shape.
+ */
+const paintOf = (element: Element, inherited: Painted): Painted => {
+  const style = element.getAttribute('style');
+  const pick = (property: string, attribute = property): string | null =>
+    styleProp(style, property) ?? element.getAttribute(attribute);
+
+  return {
+    fill: pick('fill') ?? inherited.fill,
+    stroke: pick('stroke') ?? inherited.stroke,
+    strokeWidth: pick('stroke-width') ?? inherited.strokeWidth,
+    fillRule: pick('fill-rule') ?? inherited.fillRule,
+  };
+};
+
+/** `url(#gradient)` and friends cannot be resolved outside the SVG's own DOM. */
+const isPaintServer = (value: string): boolean => value.startsWith('url(');
+
+const usableColor = (value: string | null): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (trimmed === 'none' || trimmed === 'currentColor' || trimmed === 'transparent') return undefined;
+  if (isPaintServer(trimmed)) return undefined;
+  return trimmed;
+};
+
+const collect = (
+  root: Element,
+  inherited: Matrix,
+  out: SVGPathData[],
+  paint: Painted,
+): void => {
   for (const child of Array.from(root.children)) {
     const tag = child.tagName.toLowerCase();
     if (SKIP_TAGS.has(tag)) continue;
 
     const matrix = multiply(inherited, parseTransform(child.getAttribute('transform')));
+    const painted = paintOf(child, paint);
 
     if (!child.matches(SHAPE_SELECTOR)) {
-      collect(child, matrix, out);
+      collect(child, matrix, out, painted);
       continue;
     }
 
     const d = tag === 'path' ? (child.getAttribute('d')?.trim() ?? null) : shapeElementToPath(child);
     if (!d) continue;
 
-    const fill = child.getAttribute('fill');
-    const stroke = child.getAttribute('stroke');
-    const strokeWidth = parseFloat(child.getAttribute('stroke-width') ?? '');
+    const fill = painted.fill;
+    const stroke = painted.stroke;
+    const strokeWidth = parseFloat(painted.strokeWidth ?? '');
     const entry: SVGPathData = { d };
 
-    if (fill === 'none' && stroke && stroke !== 'none' && strokeWidth > 0) {
-      entry.strokeWidth = strokeWidth;
+    // A `line` or `polyline` has no interior to fill, so it is always a stroke.
+    const strokeOnly = tag === 'line' || tag === 'polyline';
+    // An unspecified fill is not an absent one: SVG's initial value is black.
+    // Only an explicit `none` means the interior is unpainted.
+    const declared = fill === null ? 'black' : fill.trim();
+    const noFill = declared === 'none' || declared === 'transparent';
+    const hasStroke = !!stroke && stroke.trim() !== 'none';
+
+    if ((noFill || strokeOnly) && hasStroke) {
+      entry.strokeWidth = Number.isFinite(strokeWidth) && strokeWidth > 0 ? strokeWidth : 1;
+      const color = usableColor(stroke);
+      if (color) entry.color = color;
+    } else if (noFill && !hasStroke) {
+      // Nothing paints this element. Skipping keeps invisible geometry out of
+      // the silhouette instead of stamping it as a solid blob.
+      continue;
     } else {
-      entry.evenOdd = child.getAttribute('fill-rule') === 'evenodd';
+      entry.evenOdd = painted.fillRule === 'evenodd';
+      const color = usableColor(fill);
+      if (color) entry.color = color;
     }
 
     if (!isIdentity(matrix)) entry.transform = matrix;
@@ -242,7 +319,9 @@ export const parseSVG = (source: string): SVGShapeData => {
   }
 
   const paths: SVGPathData[] = [];
-  collect(svg, IDENTITY, paths);
+  // The root can carry the paint everything inherits —  on <svg>
+  // is how nearly every stroked icon set is authored.
+  collect(svg, IDENTITY, paths, paintOf(svg, { fill: null, stroke: null, strokeWidth: null, fillRule: null }));
   if (paths.length === 0) throw new Error('stipple-gl: no drawable geometry found in SVG');
 
   const result: SVGShapeData = { paths, viewBox };

@@ -103,7 +103,11 @@ scope.onmessage = (event: MessageEvent<MainToWorker>): void => {
           shapes: shapeSupport,
           behaviors: createDefaultBehaviors(),
         });
-        runtime = new Runtime(canvas, options);
+        runtime = new Runtime(canvas, options, {
+          // The main thread only samples stats twice a second, which is far too
+          // coarse to resolve a morphTo promise on. Arrival gets its own message.
+          onMorphSettled: (value) => post({ type: 'morphsettled', value }),
+        });
         applyResolution(message.viewport.width, message.viewport.height, message.viewport.dpr);
         runtime.allocate();
         post({ type: 'ready' });
@@ -121,11 +125,15 @@ scope.onmessage = (event: MessageEvent<MainToWorker>): void => {
         break;
 
       case 'shape':
-        runtime?.setShape(message.shape);
+        runtime?.setShape(message.shape, message.choreography);
         break;
 
       case 'options':
         runtime?.setOptions(message.config);
+        break;
+
+      case 'reset':
+        runtime?.resetOptions(message.config);
         break;
 
       case 'count':

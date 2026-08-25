@@ -3,6 +3,7 @@ import type { Behavior, SimContext } from '../core/types';
 
 export const createJellyBehavior = (): Behavior => ({
   name: 'jelly',
+  phase: 'deform',
   order: 20,
   step(ctx: SimContext): void {
     const { major, options, state } = ctx;

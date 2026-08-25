@@ -2,6 +2,7 @@ import type { Behavior, SimContext } from '../core/types';
 
 export const createBreatheBehavior = (): Behavior => ({
   name: 'breathe',
+  phase: 'deform',
   order: 15,
   step(ctx: SimContext): void {
     const { major, options, state } = ctx;

@@ -1,14 +1,20 @@
 import { resolveTarget, styleCanvas } from '../core/engine';
 import { resolveOptions } from '../core/options';
+import { MorphEmitter } from '../core/emitter';
 import { fail } from '../core/runtime';
+import { validateConfig } from '../core/validate';
 import type {
+  ChoreographyConfig,
+  MorphOptions,
   ShapeConfig,
   StippleConfig,
+  StippleEvent,
+  StippleEventMap,
   StippleInstance,
   StippleOptions,
 } from '../core/types';
 import type { MainToWorker, ShapeBox, WorkerToMain } from './protocol';
-import { droppedKeys, sanitizeConfig } from './protocol';
+import { droppedKeys, sanitizeChoreography, sanitizeConfig } from './protocol';
 
 export type WorkerTarget = HTMLElement | HTMLCanvasElement | string;
 
@@ -34,6 +40,8 @@ export class WorkerStipple implements StippleInstance {
   private shapeBox: ShapeBox = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
   private hasShape = false;
   private morph = 0;
+  private shape: ShapeConfig | null = null;
+  private readonly events = new MorphEmitter();
   private targetMorph = 0;
   private fpsValue = 0;
 
@@ -51,6 +59,7 @@ export class WorkerStipple implements StippleInstance {
     if (!workerModeSupported()) throw fail('OffscreenCanvas worker mode is not supported here');
 
     const { worker, workerUrl, onDroppedOptions, ...rest } = config ?? {};
+    if (process.env.NODE_ENV !== 'production') validateConfig(rest);
     this.opts = resolveOptions(rest);
 
     const element = resolveTarget(target);
@@ -95,9 +104,15 @@ export class WorkerStipple implements StippleInstance {
     const message = event.data;
     if (message.type === 'stats') {
       this.fpsValue = message.fps;
-      this.morph = message.morph;
+      if (message.morph !== this.morph) {
+        this.morph = message.morph;
+        this.events.progress(this.morph);
+      }
       this.hasShape = message.hasShape;
       this.shapeBox = message.box;
+    } else if (message.type === 'morphsettled') {
+      this.morph = message.value;
+      this.events.arrived(message.value);
     } else if (message.type === 'error') {
       this.opts.onError?.(fail(message.message));
     } else if (message.type === 'ready') {
@@ -239,22 +254,75 @@ export class WorkerStipple implements StippleInstance {
     return this.fpsValue;
   }
 
-  setMorph(value: number): void {
+  setMorph(value: number): Promise<void> {
     this.targetMorph = value < 0 ? 0 : value > 1 ? 1 : value;
+    const settled = this.events.begin(this.morph, this.targetMorph, this.shape);
     this.send({ type: 'morph', value: this.targetMorph });
+    return settled;
   }
 
   getMorph(): number {
     return this.morph;
   }
 
-  setShape(shape: ShapeConfig | null): void {
-    this.send({ type: 'shape', shape });
+  setShape(shape: ShapeConfig | null, choreography?: ChoreographyConfig | 'none'): boolean {
+    if (shape && this.opts.count === 0) {
+      this.opts.onError?.(
+        fail(
+          'setShape was ignored: this configuration has no major particles (count is 0). ' +
+            'Ambient presets like starfield and dust cannot form a shape.',
+        ),
+      );
+      return false;
+    }
+
+    // postMessage can clone an ImageBitmap but not a DOM element, so a shape
+    // built from an <img> or a <canvas> would throw DataCloneError here. Say so
+    // rather than letting the structured clone fail with nothing actionable.
+    if (shape?.image && !(shape.image instanceof ImageBitmap)) {
+      this.opts.onError?.(
+        fail(
+          'worker mode needs an ImageBitmap: build the shape with imageFromURL() or ' +
+            'rasterizeSVG(), which return one, rather than an <img> or <canvas> element',
+        ),
+      );
+      return false;
+    }
+
+    this.shape = shape;
+    this.send({ type: 'shape', shape, choreography: sanitizeChoreography(choreography) });
+    this.events.shapeChanged(shape);
+    return true;
+  }
+
+  morphTo(shape: ShapeConfig | null, options: MorphOptions = {}): Promise<void> {
+    if (options.enter) this.setOptions({ transition: { enter: options.enter } });
+    if (shape === null) return this.release();
+    if (!this.setShape(shape, options.swap)) return Promise.resolve();
+    return this.setMorph(1);
+  }
+
+  release(): Promise<void> {
+    return this.setMorph(0);
+  }
+
+  on<E extends StippleEvent>(event: E, handler: (payload: StippleEventMap[E]) => void): () => void {
+    return this.events.on(event, handler);
+  }
+
+  off<E extends StippleEvent>(event: E, handler: (payload: StippleEventMap[E]) => void): void {
+    this.events.off(event, handler);
   }
 
   setOptions(config: StippleConfig): void {
     this.opts = resolveOptions({ ...this.opts, ...config } as StippleConfig);
     this.send({ type: 'options', config: sanitizeConfig(config) });
+  }
+
+  resetOptions(config?: StippleConfig): void {
+    const { onReady, onError } = this.opts;
+    this.opts = resolveOptions({ ...config, onReady, onError });
+    this.send({ type: 'reset', config: sanitizeConfig(config ?? {}) });
   }
 
   setCount(count: number, minorCount?: number): void {

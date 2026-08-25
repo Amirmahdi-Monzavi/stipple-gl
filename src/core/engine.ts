@@ -1,9 +1,15 @@
+import { MorphEmitter } from './emitter';
 import { resolveOptions } from './options';
+import { validateConfig } from './validate';
 import { fail, Runtime } from './runtime';
 import type {
+  ChoreographyConfig,
+  MorphOptions,
   RenderMode,
   ShapeConfig,
   StippleConfig,
+  StippleEvent,
+  StippleEventMap,
   StippleInstance,
   StippleOptions,
 } from './types';
@@ -59,6 +65,7 @@ export class StippleCore implements StippleInstance {
   readonly canvas: HTMLCanvasElement;
 
   protected runtime: Runtime;
+  protected readonly events = new MorphEmitter();
   private host: HTMLElement;
   private ownsCanvas: boolean;
 
@@ -79,6 +86,8 @@ export class StippleCore implements StippleInstance {
 
   constructor(target: StippleTarget, config?: StippleConfig) {
     if (typeof window === 'undefined') throw fail('Stipple requires a browser environment');
+
+    if (process.env.NODE_ENV !== 'production') validateConfig(config);
 
     const opts = resolveOptions(config);
     const element = resolveTarget(target);
@@ -102,6 +111,8 @@ export class StippleCore implements StippleInstance {
           this.canvas.width = Math.floor(viewport.width * viewport.dpr);
           this.canvas.height = Math.floor(viewport.height * viewport.dpr);
         },
+        onMorphProgress: (value) => this.events.progress(value),
+        onMorphSettled: (value) => this.events.arrived(value),
       });
     } catch (error) {
       opts.onError?.(error as Error);
@@ -322,26 +333,73 @@ export class StippleCore implements StippleInstance {
     this.runtime.step(performance.now(), dt);
   }
 
-  setMorph(value: number): void {
-    this.runtime.state.targetMorph = value < 0 ? 0 : value > 1 ? 1 : value;
+  setMorph(value: number): Promise<void> {
+    const clamped = value < 0 ? 0 : value > 1 ? 1 : value;
+    const state = this.runtime.state;
+    const settled = this.events.begin(state.morph, clamped, this.runtime.shape);
+    state.targetMorph = clamped;
+
     if (!this.motionAllowed) {
-      this.runtime.state.morph = this.runtime.state.targetMorph;
+      state.morph = clamped;
       this.runtime.renderStatic(performance.now());
+      this.events.arrived(clamped);
     }
+
+    return settled;
   }
 
   getMorph(): number {
     return this.runtime.state.morph;
   }
 
-  setShape(shape: ShapeConfig | null): void {
-    this.runtime.setShape(shape);
+  setShape(shape: ShapeConfig | null, choreography?: ChoreographyConfig | 'none'): boolean {
+    const accepted = this.runtime.setShape(shape, choreography);
+    if (accepted) this.events.shapeChanged(shape);
     if (!this.motionAllowed) this.runtime.renderStatic(performance.now());
+    return accepted;
+  }
+
+  /**
+   * Set a shape and morph into it in one call, in the order that actually works.
+   * Resolves when the field arrives, or immediately if it is superseded.
+   */
+  morphTo(shape: ShapeConfig | null, options: MorphOptions = {}): Promise<void> {
+    if (options.enter) this.runtime.setOptions({ transition: { enter: options.enter } });
+
+    if (shape === null) return this.release();
+    if (!this.setShape(shape, options.swap)) return Promise.resolve();
+
+    return this.setMorph(1);
+  }
+
+  /** Return to the spread without discarding the shape, so the exit animates. */
+  release(): Promise<void> {
+    return this.setMorph(0);
+  }
+
+  on<E extends StippleEvent>(event: E, handler: (payload: StippleEventMap[E]) => void): () => void {
+    return this.events.on(event, handler);
+  }
+
+  off<E extends StippleEvent>(event: E, handler: (payload: StippleEventMap[E]) => void): void {
+    this.events.off(event, handler);
   }
 
   setOptions(config: StippleConfig): void {
+    if (process.env.NODE_ENV !== 'production') validateConfig(config);
     const previousBackground = this.runtime.opts.background;
     this.runtime.setOptions(config);
+    const next = this.runtime.opts;
+
+    if (this.ownsCanvas && next.background !== previousBackground) {
+      this.canvas.style.background = next.background;
+    }
+    if (!this.motionAllowed) this.runtime.renderStatic(performance.now());
+  }
+
+  resetOptions(config?: StippleConfig): void {
+    const previousBackground = this.runtime.opts.background;
+    this.runtime.resetOptions(config);
     const next = this.runtime.opts;
 
     if (this.ownsCanvas && next.background !== previousBackground) {
@@ -389,6 +447,7 @@ export class StippleCore implements StippleInstance {
     this.disposed = true;
     this.stop();
     this.unbind();
+    this.events.dispose();
     this.runtime.dispose();
     if (this.ownsCanvas) this.canvas.remove();
   }

@@ -2,6 +2,7 @@ import type { Behavior, SimContext } from '../core/types';
 
 export const createPointerBehavior = (): Behavior => ({
   name: 'pointer',
+  phase: 'force',
   order: 30,
   step(ctx: SimContext): void {
     const { major, options, state } = ctx;

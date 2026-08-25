@@ -1,8 +1,12 @@
 import { noise2, resolveEasing } from '../core/math';
-import type { Behavior, SimContext } from '../core/types';
+import type { Behavior, Choreography, SimContext } from '../core/types';
+
+/** Launch time and own-flight window for one particle under a choreography. */
+const launchOf = (delay: number, stagger: number): number => delay * stagger;
 
 export const createMorphBehavior = (): Behavior => ({
   name: 'morph',
+  phase: 'target',
   order: 10,
   step(ctx: SimContext): void {
     const { major, options, state } = ctx;
@@ -21,17 +25,46 @@ export const createMorphBehavior = (): Behavior => ({
 
     const morph = state.morph;
     const shaped = major.hasShape && morph > 0;
-    const easing = resolveEasing(options.transition.easing);
-
-    const stagger = shaped ? Math.min(0.9, Math.max(0, options.transition.stagger)) : 0;
-    const span = 1 - stagger;
-    const turbulence = shaped ? options.transition.turbulence : 0;
-    const flatEase = stagger > 0 ? 0 : easing(morph);
     const time = state.time * 0.001;
 
-    const sweep = options.transition.sweep;
-    const sweepWidth = Math.max(0.02, options.transition.sweepWidth);
-    const sweeping = sweep > 0 && stagger > 0 && morph > 0 && morph < 1;
+    // Which way the morph is heading decides whose choreography is in force.
+    const move: Choreography =
+      state.targetMorph < state.morph ? state.choreo.exit : state.choreo.enter;
+
+    const easing = resolveEasing(move.easing);
+    const stagger = shaped ? Math.min(0.9, Math.max(0, move.stagger)) : 0;
+    const span = 1 - stagger;
+    const turbulence = shaped ? move.turbulence : 0;
+    const flatEase = stagger > 0 ? 0 : easing(morph);
+    const flash = move.flash;
+    const flashWidth = Math.max(0.02, move.flashWidth);
+    const flashing = flash > 0 && stagger > 0 && morph > 0 && morph < 1;
+
+    // A swap runs on its own progress value and composes with the morph: it
+    // decides *which* shape target a particle is heading for, then the morph
+    // decides how far from the sphere toward that target it currently sits.
+    const swapChoreo = state.choreo.swap;
+    const swapping = state.swapping && swapChoreo !== null && major.hasShape;
+    const swapProgress = state.swap;
+    let swapEasing = easing;
+    let swapStagger = 0;
+    let swapSpan = 1;
+    let swapFlatEase = 1;
+    let swapTurbulence = 0;
+    let swapFlash = 0;
+    let swapFlashWidth = 0.22;
+    let swapFlashing = false;
+
+    if (swapping && swapChoreo) {
+      swapEasing = resolveEasing(swapChoreo.easing);
+      swapStagger = Math.min(0.9, Math.max(0, swapChoreo.stagger));
+      swapSpan = 1 - swapStagger;
+      swapFlatEase = swapStagger > 0 ? 0 : swapEasing(swapProgress);
+      swapTurbulence = swapChoreo.turbulence;
+      swapFlash = swapChoreo.flash;
+      swapFlashWidth = Math.max(0.02, swapChoreo.flashWidth);
+      swapFlashing = swapFlash > 0 && swapStagger > 0 && swapProgress > 0 && swapProgress < 1;
+    }
 
     for (let i = 0; i < count; i++) {
       const lx = major.spreadX[i]!;
@@ -54,31 +87,72 @@ export const createMorphBehavior = (): Behavior => ({
         continue;
       }
 
+      const delay = major.delay[i]!;
+
+      // 1. Where is this particle's shape target right now? Mid-swap that is a
+      //    point between the outgoing and incoming shapes.
+      let goalX = major.shapeX[i]!;
+      let goalY = major.shapeY[i]!;
+      let goalZ = major.shapeZ[i]!;
+      let swapLocal = 1;
+
+      if (swapping) {
+        if (swapStagger > 0) {
+          const launch = launchOf(delay, swapStagger);
+          const raw = (swapProgress - launch) / swapSpan;
+          swapLocal = raw < 0 ? 0 : raw > 1 ? 1 : raw;
+          swapLocal = swapEasing(swapLocal);
+        } else {
+          swapLocal = swapFlatEase;
+        }
+
+        const px = major.prevShapeX[i]!;
+        const py = major.prevShapeY[i]!;
+        const pz = major.prevShapeZ[i]!;
+        goalX = px + (goalX - px) * swapLocal;
+        goalY = py + (goalY - py) * swapLocal;
+        goalZ = pz + (goalZ - pz) * swapLocal;
+      }
+
+      // 2. How far along the sphere-to-shape journey is it?
       let local = morph;
       let launch = 0;
 
       if (stagger > 0) {
-        launch = major.delay[i]! * stagger;
+        launch = launchOf(delay, stagger);
         local = (morph - launch) / span;
         local = local < 0 ? 0 : local > 1 ? 1 : local;
       }
 
-      if (sweeping) {
+      const eased = stagger > 0 ? easing(local) : flatEase;
+
+      let tx = sx + (goalX - sx) * eased;
+      let ty = sy + (goalY - sy) * eased;
+      const tz = rz + (goalZ - rz) * eased;
+
+      // 3. Flash belongs to whichever wavefront is actually crossing.
+      if (swapFlashing) {
+        const distance = Math.abs(swapProgress - launchOf(delay, swapStagger));
+        major.flash[i] = distance < swapFlashWidth ? (1 - distance / swapFlashWidth) * swapFlash : 0;
+      } else if (flashing) {
         const distance = Math.abs(morph - launch);
-        major.flash[i] = distance < sweepWidth ? (1 - distance / sweepWidth) * sweep : 0;
+        major.flash[i] = distance < flashWidth ? (1 - distance / flashWidth) * flash : 0;
       } else if (major.flash[i] !== 0) {
         major.flash[i] = 0;
       }
 
-      const eased = stagger > 0 ? easing(local) : flatEase;
+      // 4. Turbulence, from whichever move is mid-flight.
+      const inMorphFlight = local > 0 && local < 1;
+      const inSwapFlight = swapping && swapLocal > 0 && swapLocal < 1;
 
-      let tx = sx + (major.shapeX[i]! - sx) * eased;
-      let ty = sy + (major.shapeY[i]! - sy) * eased;
-      const tz = rz + (major.shapeZ[i]! - rz) * eased;
-
-      if (turbulence > 0 && local > 0 && local < 1) {
+      if (turbulence > 0 && inMorphFlight) {
         const burst = local * (1 - local) * 4;
         const amount = burst * turbulence;
+        tx += (noise2(i * 0.13, time * 0.7) - 0.5) * amount;
+        ty += (noise2(i * 0.17 + 55.3, time * 0.7) - 0.5) * amount;
+      } else if (swapTurbulence > 0 && inSwapFlight) {
+        const burst = swapLocal * (1 - swapLocal) * 4;
+        const amount = burst * swapTurbulence;
         tx += (noise2(i * 0.13, time * 0.7) - 0.5) * amount;
         ty += (noise2(i * 0.17 + 55.3, time * 0.7) - 0.5) * amount;
       }

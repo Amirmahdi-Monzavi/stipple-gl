@@ -3,6 +3,7 @@ import type { Behavior, SimContext } from '../core/types';
 
 export const createDriftBehavior = (): Behavior => ({
   name: 'drift',
+  phase: 'ambient',
   order: 60,
   step(ctx: SimContext): void {
     const { minor, options, state } = ctx;

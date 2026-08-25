@@ -27,6 +27,9 @@ const bundle = async (entry) => {
     write: false,
     external: ['react', 'react-dom'],
     target: 'es2022',
+    // Every real consumer bundles for production, which folds the dev-only
+    // validation out. Measuring without this would overstate what people ship.
+    define: { 'process.env.NODE_ENV': '"production"' },
   });
   return result.outputFiles[0].contents;
 };

@@ -1,4 +1,6 @@
+# pnpm 11 honours `allowBuilds`; `onlyBuiltDependencies` is the pnpm 10 spelling,
+# kept so the repo installs cleanly on either major.
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: true
 onlyBuiltDependencies:
   - esbuild

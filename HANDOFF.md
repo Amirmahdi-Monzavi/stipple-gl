@@ -2,7 +2,7 @@
 
 Working notes for picking this up on another machine. Not part of the published package — delete it before `npm publish` if you like, or keep it, it is excluded from `files` in package.json either way.
 
-Last worked on: 2026-08-25.
+Last worked on: 2026-08-25 (evening session: full API redesign, see CHANGELOG).
 
 ---
 
@@ -12,9 +12,11 @@ Last worked on: 2026-08-25.
 pnpm install
 ```
 
-If pnpm reports `ERR_PNPM_IGNORED_BUILDS` for esbuild, that is expected on a fresh machine. `pnpm-workspace.yaml` already contains the allowlist:
+If pnpm reports `ERR_PNPM_IGNORED_BUILDS` for esbuild, `pnpm-workspace.yaml` is wrong. pnpm 11 reads `allowBuilds` (a name-to-boolean map); `onlyBuiltDependencies` is the pnpm 10 spelling and is ignored by 11. Both are present now:
 
 ```yaml
+allowBuilds:
+  esbuild: true
 onlyBuiltDependencies:
   - esbuild
 ```
@@ -45,6 +47,7 @@ Everything below is committed. `git log` has the detail — the commit messages 
 | `7e7811b` | Reworked sprite quality, sphere layout, morph transition |
 | `c2062c0` | Sweep transition, per-frame optimisations, lite entry, dead-prop audit |
 | `9807786` | Worker mode via OffscreenCanvas, DOM-free runtime |
+| _uncommitted_ | Full API redesign — see CHANGELOG "Unreleased". Twelve findings from the API review, all applied. |
 
 **Nothing is published.** No GitHub remote, nothing on npm. That was deliberate.
 
@@ -78,9 +81,13 @@ Three tests guard the split and will fail loudly if it is broken:
 - **Core is framework-agnostic; React is a thin binding.** The original was a React component. Inverting that was the point of the whole exercise.
 - **`SimulationBackend` exists so a GPU transform-feedback backend can land later.** v1 ships an optimised CPU backend deliberately, to ship rather than slip.
 - **The scroll module reads scroll position and composes with native CSS `scroll-snap`.** It deliberately does *not* port the 707-line GSAP scroll-hijacker from sinafrontend. Reasoning is in `docs/scroll.md`.
-- **`transition.easing` accepts a name as well as a function.** The name form is the only one that survives the worker boundary, because `postMessage` cannot clone functions.
+- **`easing` accepts a name as well as a function.** The name form is the only one that survives the worker boundary, because `postMessage` cannot clone functions.
 - **`spread.volume: 1` (volume-distributed sphere) is why there is no visible rim.** A shell distribution piles particles at the silhouette. Do not "simplify" this back to a shell.
-- **`transition.assign: 'angular'`** is why morphs read as condensing rather than scrambling. There is a test asserting it reaches the optimal pairing for concentric rings.
+- **`assign: 'angular'`** is why morphs read as condensing rather than scrambling. There is a test asserting it reaches the optimal pairing for concentric rings.
+- **`transition` is three choreography slots (`enter`/`exit`/`swap`), and `assign` sits outside it.** They have different lifecycles: `assign` fires on every `setShape`, choreography only while something is moving, and `major.settle` only when nothing is. Do not flatten them back together.
+- **The sweep is `stagger` + `order`. `flash` is a separate flourish, off by default.** A high `stagger` is what makes the wavefront narrow, because each particle's own flight lasts `1 - stagger`.
+- **`behaviors`, `shapes` and `backend` default to `null` and are injected at construction.** `setOptions` treats `null` as unspecified, never remove — otherwise any defaults-derived config silently tears the engine down. This cost a whole debugging session once.
+- **Culling in `pack` must invert the shader's camera transform.** Culling against the raw viewport crops the sphere the moment the camera zooms out.
 
 ---
 
@@ -90,7 +97,7 @@ Re-measure before changing any of these in the README.
 
 | claim | how to reproduce |
 |---|---|
-| lite 9.78 KB / full 14.79 KB / react 15.82 KB gzipped | `node scripts/measure.mjs` |
+| lite 12.50 KB / full 19.12 KB / react 18.94 KB gzipped | `node scripts/measure.mjs` (bundles with NODE_ENV=production, as a real consumer does) |
 | per-module bundle attribution | `node scripts/analyze.mjs stipple` |
 | 25,000 particles at ~8 ms CPU/frame | snippet at the end of `docs/performance.md` |
 | worker keeps 60 fps through a 900 ms main-thread block | `docs/worker.md` |
@@ -120,11 +127,11 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
 - **LinkedIn post.** Three drafts in `docs/launch-post.md`, links left as placeholders. Recommended draft leads with the target-assignment insight. Record a 10–20s playground clip to attach; video matters more than wording there.
 - **Playground deployment.** `pnpm playground:build` outputs to `dist-playground/`. Not deployed anywhere yet.
 - **React worker component.** `stipple-gl/worker` is imperative only; `docs/worker.md` shows the `useEffect` pattern. A `<WorkerParticles>` component would be a small, obvious addition.
+- **Linked lines were deliberately skipped.** It is tsparticles' signature feature, it is CPU-expensive everywhere it exists, and chasing it fights on their ground. Shape morphing is the differentiator.
 - **The playground's worker toggle is dev-only.** It constructs the worker from `../../src/worker/thread.ts` so Vite can resolve the TS source. The published path uses `new URL('./thread.js', import.meta.url)`.
 
 ## Candidate next features, roughly in order of value
 
 1. **GPU transform-feedback backend.** Slots behind the existing `SimulationBackend` interface. Makes "runs on the GPU" fully true and lifts the ceiling past 100k particles. Pointer forces, shockwaves and target assignment all need reformulating as texture lookups — that is the hard part.
 2. **Linked lines between nearby particles.** The most visible feature gap versus tsparticles. Needs a spatial grid and a second draw call, and is CPU-expensive everywhere it exists.
-3. **Per-particle colour gradients** — colour by depth or by radius. Cheap, since colour is already per-vertex in the packed buffer.
-4. **CDN / IIFE build** for CodePen embeds. Was considered and skipped for v1.
+3. **Playground deployment and the launch post.** The only things between here and publishing.

@@ -1,4 +1,4 @@
-import type { ShapeConfig } from '../core/types';
+import type { ImageSource, SampledShape, ShapeConfig, ShapeDetail } from '../core/types';
 
 export interface SampleSettings {
   maxRaster: number;
@@ -54,6 +54,8 @@ const acquireRaster = (width: number, height: number): Raster => {
 export const releaseRaster = (): void => {
   raster = null;
   hits = new Uint32Array(0);
+  weightScratch = new Float32Array(0);
+  fieldScratch = new Float32Array(0);
 };
 
 const parseViewBox = (viewBox: string | undefined): [number, number, number, number] => {
@@ -61,39 +63,26 @@ const parseViewBox = (viewBox: string | undefined): [number, number, number, num
   return [parts[0] ?? 0, parts[1] ?? 0, parts[2] || 100, parts[3] || 100];
 };
 
-export const sampleShape = (
+const imageWidth = (image: ImageSource): number =>
+  (image as HTMLImageElement).naturalWidth ||
+  (image as HTMLVideoElement).videoWidth ||
+  (image as ImageBitmap).width ||
+  0;
+
+const imageHeight = (image: ImageSource): number =>
+  (image as HTMLImageElement).naturalHeight ||
+  (image as HTMLVideoElement).videoHeight ||
+  (image as ImageBitmap).height ||
+  0;
+
+const drawPaths = (
+  ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
   shape: ShapeConfig,
-  count: number,
-  canvasWidth: number,
-  canvasHeight: number,
-  settings: Partial<SampleSettings> = {},
-): Float32Array => {
-  if (count <= 0 || canvasWidth <= 0 || canvasHeight <= 0 || shape.paths.length === 0) {
-    return new Float32Array(0);
-  }
-
-  const { maxRaster, jitter } = { ...defaultSampleSettings, ...settings };
-
-  const rasterScale = Math.min(1, maxRaster / Math.max(canvasWidth, canvasHeight));
-  const rw = Math.max(1, Math.round(canvasWidth * rasterScale));
-  const rh = Math.max(1, Math.round(canvasHeight * rasterScale));
-  const inverseScale = 1 / rasterScale;
-
-  const { ctx } = acquireRaster(rw, rh);
-
-  const [vbx, vby, vbw, vbh] = parseViewBox(shape.viewBox);
-  const scale = shape.scale ?? 1;
-  const position = shape.position ?? { x: 0.5, y: 0.5 };
-
-  const fit = Math.min(rw / vbw, rh / vbh) * scale;
-  const tx = rw * position.x - (vbw * fit) / 2 - vbx * fit;
-  const ty = rh * position.y - (vbh * fit) / 2 - vby * fit;
-
-  ctx.fillStyle = '#000';
-  ctx.strokeStyle = '#000';
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
+  fit: number,
+  tx: number,
+  ty: number,
+  tinted: boolean,
+): void => {
   for (const entry of shape.paths) {
     ctx.setTransform(fit, 0, 0, fit, tx, ty);
     if (entry.transform) {
@@ -108,12 +97,161 @@ export const sampleShape = (
       continue;
     }
 
+    const paint = tinted ? (entry.color ?? '#000') : '#000';
     if (entry.strokeWidth) {
+      ctx.strokeStyle = paint;
       ctx.lineWidth = entry.strokeWidth;
       ctx.stroke(path);
     } else {
+      ctx.fillStyle = paint;
       ctx.fill(path, entry.evenOdd ? 'evenodd' : 'nonzero');
     }
+  }
+};
+
+let weightScratch = new Float32Array(0);
+let fieldScratch = new Float32Array(0);
+
+/**
+ * Per-hit sampling weights, returned as a cumulative sum.
+ *
+ * A flat-filled illustration is mostly interior: on a typical one, edge pixels
+ * are around 13% of the ink, so uniform sampling spends 87% of the budget where
+ * there is nothing to see and the result reads as a silhouette. Weighting moves
+ * the budget to where the picture actually is.
+ */
+const buildWeights = (
+  pixels: Uint8ClampedArray,
+  hits: Uint32Array,
+  hitCount: number,
+  width: number,
+  height: number,
+  detail: Exclude<ShapeDetail, 'uniform'>,
+  strength: number,
+): Float32Array | null => {
+  const total = width * height;
+  if (fieldScratch.length < total * 2) fieldScratch = new Float32Array(total * 2);
+  if (weightScratch.length < hitCount) weightScratch = new Float32Array(hitCount);
+
+  // Two fields, because a shape's edges live in two different places.
+  //
+  //   tone     premultiplied luminance — internal colour boundaries
+  //   coverage alpha — the silhouette
+  //
+  // Tone alone is blind to the commonest case there is: a flat black icon on
+  // transparent, where luminance is 0 inside *and* out. That found no gradient
+  // at all, and at full strength every weight came out zero, which collapsed
+  // the whole field onto one pixel.
+  const tone = fieldScratch.subarray(0, total);
+  const coverage = fieldScratch.subarray(total, total * 2);
+
+  for (let i = 0; i < total; i++) {
+    const o = i * 4;
+    const a = pixels[o + 3]! / 255;
+    tone[i] = (0.2126 * pixels[o]! + 0.7152 * pixels[o + 1]! + 0.0722 * pixels[o + 2]!) * a;
+    coverage[i] = a * 255;
+  }
+
+  const mix = strength < 0 ? 0 : strength > 1 ? 1 : strength;
+  const weights = weightScratch;
+  let running = 0;
+  let weighted = 0;
+
+  for (let h = 0; h < hitCount; h++) {
+    const index = hits[h]!;
+    const x = index % width;
+    const y = (index / width) | 0;
+
+    let value: number;
+
+    if (detail === 'density') {
+      // Classic stippling: darker ink earns more dots.
+      const alpha = pixels[index * 4 + 3]! / 255;
+      value = (1 - tone[index]! / 255) * alpha;
+    } else {
+      // Central differences over both fields. Border pixels clamp rather than
+      // skip, since a silhouette running off the raster is still an edge.
+      const left = x > 0 ? index - 1 : index;
+      const right = x < width - 1 ? index + 1 : index;
+      const up = y > 0 ? index - width : index;
+      const down = y < height - 1 ? index + width : index;
+
+      const gradient =
+        Math.abs(tone[right]! - tone[left]!) +
+        Math.abs(tone[down]! - tone[up]!) +
+        Math.abs(coverage[right]! - coverage[left]!) +
+        Math.abs(coverage[down]! - coverage[up]!);
+
+      // Square-root compresses the range so a hard black-on-white border does
+      // not take the entire budget and leave soft edges with nothing.
+      value = Math.sqrt(gradient / 255);
+    }
+
+    if (value > 0) weighted++;
+    running += 1 - mix + mix * (value > 1 ? 1 : value);
+    weights[h] = running;
+  }
+
+  // Nothing to go on — a single flat colour with no alpha edge, say. Uniform is
+  // the honest answer, and it is the only one that does not divide by zero.
+  if (running <= 0 || weighted === 0) return null;
+
+  return weights;
+};
+
+export const sampleShape = (
+  shape: ShapeConfig,
+  count: number,
+  canvasWidth: number,
+  canvasHeight: number,
+  settings: Partial<SampleSettings> = {},
+): SampledShape => {
+  const hasImage = !!shape.image;
+  if (count <= 0 || canvasWidth <= 0 || canvasHeight <= 0) {
+    return { points: new Float32Array(0), colors: null };
+  }
+  if (!hasImage && shape.paths.length === 0) {
+    return { points: new Float32Array(0), colors: null };
+  }
+
+  const { maxRaster, jitter } = { ...defaultSampleSettings, ...settings };
+
+  const rasterScale = Math.min(1, maxRaster / Math.max(canvasWidth, canvasHeight));
+  const rw = Math.max(1, Math.round(canvasWidth * rasterScale));
+  const rh = Math.max(1, Math.round(canvasHeight * rasterScale));
+  const inverseScale = 1 / rasterScale;
+
+  const { ctx } = acquireRaster(rw, rh);
+
+  const scale = shape.scale ?? 1;
+  const position = shape.position ?? { x: 0.5, y: 0.5 };
+
+  // A raster source carries its own colour, so it is always sampled tinted.
+  let tinted = hasImage;
+
+  if (hasImage) {
+    const image = shape.image!;
+    const iw = imageWidth(image);
+    const ih = imageHeight(image);
+    if (iw <= 0 || ih <= 0) return { points: new Float32Array(0), colors: null };
+
+    const fit = Math.min(rw / iw, rh / ih) * scale;
+    const dw = iw * fit;
+    const dh = ih * fit;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(image as CanvasImageSource, rw * position.x - dw / 2, rh * position.y - dh / 2, dw, dh);
+  } else {
+    const [vbx, vby, vbw, vbh] = parseViewBox(shape.viewBox);
+    const fit = Math.min(rw / vbw, rh / vbh) * scale;
+    const tx = rw * position.x - (vbw * fit) / 2 - vbx * fit;
+    const ty = rh * position.y - (vbh * fit) / 2 - vby * fit;
+
+    tinted = shape.paths.some((entry) => entry.color);
+    ctx.fillStyle = '#000';
+    ctx.strokeStyle = '#000';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    drawPaths(ctx, shape, fit, tx, ty, tinted);
   }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -123,21 +261,54 @@ export const sampleShape = (
 
   if (hits.length < total) hits = new Uint32Array(total);
 
+  // Which pixels count as ink. Alpha is right for anything with transparency;
+  // a photo or a JPEG is opaque everywhere, so it needs a luminance cutoff or
+  // the whole rectangle becomes the shape.
+  const mask = shape.mask ?? 'alpha';
+  const threshold = shape.threshold ?? (mask === 'alpha' ? 0.03 : 0.5);
+  const alphaFloor = mask === 'alpha' ? threshold * 255 : 8;
+  const lumCutoff = threshold * 255;
+
   let hitCount = 0;
   for (let i = 0; i < total; i++) {
-    if (pixels[i * 4 + 3]! > 8) hits[hitCount++] = i;
+    const o = i * 4;
+    if (pixels[o + 3]! <= alphaFloor) continue;
+    if (mask !== 'alpha') {
+      const lum = 0.2126 * pixels[o]! + 0.7152 * pixels[o + 1]! + 0.0722 * pixels[o + 2]!;
+      if (mask === 'dark' ? lum > lumCutoff : lum < lumCutoff) continue;
+    }
+    hits[hitCount++] = i;
   }
 
-  if (hitCount === 0) return new Float32Array(0);
+  if (hitCount === 0) return { points: new Float32Array(0), colors: null };
 
   const out = new Float32Array(count * 2);
-  const step = hitCount / count;
+  const tints = tinted ? new Uint32Array(count) : null;
+
+  const detail = shape.detail ?? 'uniform';
+  const weights =
+    detail === 'uniform' ? null : buildWeights(pixels, hits, hitCount, rw, rh, detail, shape.detailStrength ?? 0.85);
+
+  // Stratified inverse-CDF sampling. With no weights the running total is just
+  // the index, so this reduces exactly to the even stride it replaces.
+  const totalWeight = weights ? weights[hitCount - 1]! : hitCount;
+  const step = totalWeight / count;
   let cursor = Math.random() * step;
+  let walker = 0;
 
   for (let i = 0; i < count; i++) {
     const jittered = cursor + (Math.random() - 0.5) * step;
-    let index = jittered < 0 ? 0 : jittered | 0;
-    if (index >= hitCount) index = hitCount - 1;
+    const target = jittered < 0 ? 0 : jittered;
+
+    let index: number;
+    if (weights) {
+      // The targets ascend, so the walker never needs to go backwards.
+      while (walker < hitCount - 1 && weights[walker]! < target) walker++;
+      index = walker;
+    } else {
+      index = target | 0;
+      if (index >= hitCount) index = hitCount - 1;
+    }
 
     const pixel = hits[index]!;
     const px = pixel % rw;
@@ -146,10 +317,15 @@ export const sampleShape = (
     out[i * 2] = (px + 0.5 + (Math.random() - 0.5) * jitter) * inverseScale;
     out[i * 2 + 1] = (py + 0.5 + (Math.random() - 0.5) * jitter) * inverseScale;
 
+    if (tints) {
+      const o = pixel * 4;
+      tints[i] = pixels[o]! | (pixels[o + 1]! << 8) | (pixels[o + 2]! << 16);
+    }
+
     cursor += step;
   }
 
-  return out;
+  return { points: out, colors: tints };
 };
 
 export const shapeBounds = (points: Float32Array): {

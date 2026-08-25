@@ -20,6 +20,8 @@ export interface SVGPathData {
   evenOdd?: boolean;
   strokeWidth?: number;
   transform?: Matrix;
+  /** The path's own fill (or stroke), kept so `color: { type: 'shape' }` works. */
+  color?: string;
 }
 
 export interface SVGShapeData {
@@ -29,8 +31,53 @@ export interface SVGShapeData {
   height?: number;
 }
 
+/**
+ * Anything the 2D canvas can draw. In worker mode only an ImageBitmap survives
+ * the postMessage boundary — the DOM element types do not exist there.
+ */
+export type ImageSource =
+  | ImageBitmap
+  | HTMLImageElement
+  | HTMLCanvasElement
+  | OffscreenCanvas
+  | HTMLVideoElement;
+
+/** Which pixels of a raster source count as ink. */
+export type ImageMask = 'alpha' | 'dark' | 'light';
+
+/**
+ * How the particle budget is spread across the ink.
+ *
+ * `uniform` gives every ink pixel the same chance, which is right for line art
+ * but turns a flat-filled illustration into a silhouette: the interior of a
+ * solid region carries no information, and most of the budget lands there.
+ */
+export type ShapeDetail = 'uniform' | 'edges' | 'density';
+
 export interface ShapeConfig {
+  /** Vector geometry. Empty when the shape is raster-backed. */
   paths: SVGPathData[];
+  /**
+   * A raster source to sample instead of `paths` — PNG, JPEG, WebP, AVIF, GIF,
+   * a canvas, a video frame, or an SVG that has been rasterised so gradients
+   * and filters survive. Takes precedence over `paths` when both are present.
+   */
+  image?: ImageSource;
+  /** How ink is decided for `image`. Defaults to `'alpha'`. */
+  mask?: ImageMask;
+  /** Cutoff for `mask`, 0..1. Defaults to 0.03 for alpha, 0.5 otherwise. */
+  threshold?: number;
+  /**
+   * How the particle budget is spread across the ink. Defaults to `'uniform'`.
+   * Applies to both vector and raster sources.
+   */
+  detail?: ShapeDetail;
+  /**
+   * How hard `detail` is applied, 0..1. `0` is uniform regardless, `1` is the
+   * full weighting. Defaults to `0.85` — a little uniform keeps flat regions
+   * from emptying out completely.
+   */
+  detailStrength?: number;
   viewBox?: string;
   scale?: number;
   position?: XY;
@@ -48,6 +95,12 @@ export interface MajorOptions {
   damping: number;
   twinkle: number;
   depth: number;
+  /**
+   * Follow strength once fully morphed and undisturbed. This is a steady state,
+   * not a transition — it lives here rather than under `transition` because it
+   * describes how particles hold position when nothing is moving.
+   */
+  settle: number;
 }
 
 export interface MinorOptions {
@@ -74,19 +127,77 @@ export interface EmissionOptions {
   turbulence: number;
 }
 
-export interface TransitionOptions {
+/**
+ * How one change of state is performed. The same seven knobs describe entering a
+ * shape, leaving it, and swapping one shape for another — learn them once.
+ */
+export interface Choreography {
+  /** Rate the progress value approaches its target, per frame at 60fps. */
   speed: number;
+  /** Curve applied to each particle's own flight. */
   easing: Easing | EasingName;
-  assign: 'angular' | 'index' | 'random';
-  settle: number;
+  /**
+   * How far apart particle launch times are pushed, 0 to 0.9. Each particle's
+   * flight then lasts `1 - stagger`, so a high value means only a narrow band is
+   * ever moving — that is what reads as a wipe. `0` means everything moves
+   * together and `order` stops mattering.
+   */
   stagger: number;
+  /** Which direction the wavefront travels. Ignored when `stagger` is 0. */
   order: StaggerOrder;
-  sweep: number;
-  sweepWidth: number;
+  /** Noise displacement while in flight, peaking mid-move and fading on arrival. */
   turbulence: number;
+  /** Brightness and size boost on particles the wavefront is currently crossing. */
+  flash: number;
+  /** Width of the flashing band, in progress units. */
+  flashWidth: number;
 }
 
-export type StaggerOrder = 'random' | 'x' | 'y' | 'radial' | 'angular';
+/** Ready-made choreographies. Expand to a full {@link Choreography} at resolve time. */
+export type ChoreographyName = 'uniform' | 'sweep' | 'burst';
+
+export type ChoreographyConfig = ChoreographyName | DeepPartial<Choreography>;
+
+export interface ResolvedChoreographies {
+  enter: Choreography;
+  exit: Choreography;
+  /** `null` when `transition.swap` is `'none'` — retarget instantly. */
+  swap: Choreography | null;
+}
+
+export interface TransitionOptions {
+  /** Spread to shape. */
+  enter: ChoreographyConfig;
+  /** Shape back to spread. `'mirror'` reuses `enter` at a gentler speed. */
+  exit: ChoreographyConfig | 'mirror';
+  /** One shape to another. `'none'` retargets instantly, as v0 always did. */
+  swap: ChoreographyConfig | 'none';
+}
+
+export type StaggerOrder = 'random' | 'x' | 'y' | 'radial' | 'radar';
+
+export type AssignMode = 'angular' | 'index' | 'random';
+
+/**
+ * Pairs particles with sampled shape points. Write positions into `outX`/`outY`/
+ * `outZ` at the index of the particle that should own each target.
+ */
+export type AssignFn = (
+  points: Float32Array,
+  count: number,
+  spreadX: Float32Array,
+  spreadY: Float32Array,
+  outX: Float32Array,
+  outY: Float32Array,
+  outZ: Float32Array,
+  depth: number,
+) => void;
+
+/** Solid colour, a ramp across the field, or the source SVG's own fills. */
+export type ColorSpec =
+  | string
+  | { type: 'ramp'; from: string; to: string; by: 'depth' | 'radius' | 'index' }
+  | { type: 'shape'; fallback: string };
 
 export interface SpreadOptions {
   radius: number;
@@ -119,13 +230,14 @@ export interface PointerOptions {
   shockwaveThickness: number;
 }
 
+export interface SampledShape {
+  points: Float32Array;
+  /** Packed 0x00RRGGBB per point, or `null` when the source carried no fills. */
+  colors: Uint32Array | null;
+}
+
 export interface ShapeSupport {
-  sample(
-    shape: ShapeConfig,
-    count: number,
-    width: number,
-    height: number,
-  ): Float32Array;
+  sample(shape: ShapeConfig, count: number, width: number, height: number): SampledShape;
   bounds(points: Float32Array): {
     minX: number;
     minY: number;
@@ -135,7 +247,7 @@ export interface ShapeSupport {
     cy: number;
   };
   assign(
-    mode: 'angular' | 'index' | 'random',
+    mode: AssignMode | AssignFn,
     points: Float32Array,
     count: number,
     spreadX: Float32Array,
@@ -144,6 +256,7 @@ export interface ShapeSupport {
     outY: Float32Array,
     outZ: Float32Array,
     depth: number,
+    order?: Uint32Array,
   ): void;
 }
 
@@ -151,8 +264,8 @@ export interface StippleOptions {
   count: number;
   minorCount: number;
   mode: RenderMode;
-  color: string;
-  minorColor: string | null;
+  color: ColorSpec;
+  minorColor: ColorSpec | null;
   background: string;
   opacity: number;
   blend: BlendMode;
@@ -167,6 +280,12 @@ export interface StippleOptions {
   major: MajorOptions;
   minor: MinorOptions;
   emission: EmissionOptions;
+  /**
+   * How particles are paired with sampled shape points. A property of the shape,
+   * not of the move, so it lives outside `transition` — it applies every time a
+   * shape is set, including a swap.
+   */
+  assign: AssignMode | AssignFn;
   transition: TransitionOptions;
   spread: SpreadOptions;
   jelly: JellyOptions;
@@ -232,9 +351,33 @@ export interface FrameState {
   targetMorph: number;
   hasShape: boolean;
   shapeColor: string | null;
+  /**
+   * Progress of a shape-to-shape swap, 0 at the outgoing shape and 1 at the
+   * incoming one. Sits alongside `morph` rather than inside it: a swap can run
+   * while the field is only half-morphed, and the two compose.
+   */
+  swap: number;
+  swapping: boolean;
+  /**
+   * Choreographies resolved from `transition`, refreshed whenever options
+   * change. Behaviours read these rather than re-expanding names every frame.
+   */
+  choreo: ResolvedChoreographies;
   viewport: Viewport;
   pointer: PointerState;
   shockwaves: Shockwave[];
+  /**
+   * Camera the renderer will apply this frame. `pack` needs it: culling happens
+   * in viewport pixels, but the camera can pull off-viewport particles back into
+   * view, and anything already culled would leave a visible rectangular crop.
+   */
+  camera: Camera;
+}
+
+export interface Camera {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 export interface SimContext {
@@ -269,6 +412,16 @@ export interface MajorState {
   shapeX: Float32Array;
   shapeY: Float32Array;
   shapeZ: Float32Array;
+  /** Targets of the shape being swapped away from. */
+  prevShapeX: Float32Array;
+  prevShapeY: Float32Array;
+  prevShapeZ: Float32Array;
+  /** Ramp position 0..1 per particle, precomputed for `color` ramps. */
+  tint: Float32Array;
+  /** Packed 0x00RRGGBB sampled from the source SVG, when it carried fills. */
+  shapeTint: Uint32Array;
+  prevShapeTint: Uint32Array;
+  hasShapeTint: boolean;
   hasShape: boolean;
 }
 
@@ -308,12 +461,41 @@ export interface EmissionState {
   b: Float32Array;
 }
 
+/**
+ * Coarse slot in the per-frame pipeline. Phases run in the order listed here.
+ *
+ * - `target`   decides where each particle is trying to be
+ * - `deform`   warps those targets (breathing, jelly)
+ * - `force`    pushes particles around (pointer, shockwaves)
+ * - `integrate` turns velocity into position — anything after this writes
+ *   positions directly and will not be damped
+ * - `ambient`  everything independent of the major field (drift, emission)
+ */
+export type BehaviorPhase = 'target' | 'deform' | 'force' | 'integrate' | 'ambient';
+
 export interface Behavior {
   name: string;
+  /** Coarse slot. Prefer this over `order`. Defaults to `'force'`. */
+  phase?: BehaviorPhase;
+  /** Exact sort key. Wins over `phase` when both are given. */
   order?: number;
   init?(ctx: SimContext): void;
   step(ctx: SimContext): void;
   dispose?(): void;
+}
+
+export interface StippleEventMap {
+  morphstart: { from: number; to: number; shape: ShapeConfig | null };
+  morphprogress: { value: number };
+  morphend: { shape: ShapeConfig | null; cancelled: boolean };
+  shapechange: { shape: ShapeConfig | null };
+}
+
+export type StippleEvent = keyof StippleEventMap;
+
+export interface MorphOptions {
+  enter?: ChoreographyConfig;
+  swap?: ChoreographyConfig | 'none';
 }
 
 export interface BackendContext {
@@ -336,7 +518,17 @@ export interface SimulationBackend {
   reallocate(count: number, minorCount: number, viewport: Viewport): void;
   layout(viewport: Viewport): void;
   precompute(options: StippleOptions): void;
-  setShape(points: Float32Array | null, options: StippleOptions): void;
+  /**
+   * Install a new shape. When `keepPrevious` is set the outgoing targets are
+   * copied into the previous-shape buffers first, so a swap can interpolate
+   * between them instead of retargeting instantly.
+   */
+  setShape(
+    points: Float32Array | null,
+    options: StippleOptions,
+    colors?: Uint32Array | null,
+    keepPrevious?: boolean,
+  ): void;
   step(state: FrameState, options: StippleOptions): void;
   pack(target: PackTarget, options: StippleOptions, state: FrameState): number;
   dispose(): void;
@@ -347,10 +539,18 @@ export type BackendFactory = () => SimulationBackend;
 export interface StippleInstance {
   readonly canvas: HTMLCanvasElement;
   readonly options: StippleOptions;
-  setMorph(value: number): void;
+  setMorph(value: number): Promise<void>;
   getMorph(): number;
-  setShape(shape: ShapeConfig | null): void;
+  setShape(shape: ShapeConfig | null, choreography?: ChoreographyConfig | 'none'): boolean;
+  /** Set a shape and morph into it. Resolves on arrival, or when superseded. */
+  morphTo(shape: ShapeConfig | null, options?: MorphOptions): Promise<void>;
+  /** Return to the spread, animated. Resolves on arrival. */
+  release(): Promise<void>;
   setOptions(config: StippleConfig): void;
+  /** Drop every runtime tweak and rebuild from the defaults. */
+  resetOptions(config?: StippleConfig): void;
+  on<E extends StippleEvent>(event: E, handler: (payload: StippleEventMap[E]) => void): () => void;
+  off<E extends StippleEvent>(event: E, handler: (payload: StippleEventMap[E]) => void): void;
   setCount(count: number, minorCount?: number): void;
   setPageHeight(height: number | null): void;
   pulse(x: number, y: number, strength?: number): void;

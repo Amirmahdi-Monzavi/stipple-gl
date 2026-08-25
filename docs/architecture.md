@@ -177,3 +177,40 @@ The obvious next step is a transform-feedback backend: keep positions and veloci
 It is not free. Pointer forces, shockwaves, and morph target assignment all have to be reformulated as texture lookups or uniform arrays, and debugging moves into the shader. Shipping that first would have delayed everything else.
 
 So the `SimulationBackend` interface exists now, the CPU implementation is optimised to the point where allocation is zero and the noise is cheap, and the GPU backend can drop in behind the same interface without changing a line of application code.
+
+---
+
+## Extending the pipeline
+
+`Behavior` entries run in phase order. Declare a `phase` rather than guessing a number:
+
+| phase | runs | what belongs here |
+|---|---|---|
+| `target` | first | decides where each particle is trying to be (`morph`) |
+| `deform` | | warps those targets (`breathe`, `jelly`) |
+| `force` | | pushes particles around (`pointer`, `shockwave`) — the default |
+| `integrate` | | turns velocity into position (`integrate`) |
+| `ambient` | last | independent of the major field (`drift`, `emission`) |
+
+Anything after `integrate` writes positions directly and will not be damped, which is usually not what you want — that is the one ordering rule worth remembering.
+
+```ts
+import { createDefaultBehaviors } from 'stipple-gl';
+
+new Stipple('#hero', {
+  behaviors: [
+    ...createDefaultBehaviors(),
+    { name: 'gravity', phase: 'force', step: ({ major }) => {
+      for (let i = 0; i < major.count; i++) major.vy[i] += 0.02;
+    } },
+  ],
+});
+```
+
+An explicit `order` number still wins over `phase`, so the built-ins keep their fixed relative positions inside a phase. Behaviours sharing a key keep the order you listed them in.
+
+## Dev-only validation
+
+`validateConfig` runs from both hosts behind `process.env.NODE_ENV !== 'production'`. It warns about unknown keys (with a spelling suggestion), out-of-range numbers, choreography names that do not exist, and configs that cannot do what they appear to ask for. Nothing throws.
+
+Bundlers fold the guard in production and the module drops out entirely — verified by `node scripts/measure.mjs`, which bundles with `NODE_ENV=production` exactly as a real consumer would.

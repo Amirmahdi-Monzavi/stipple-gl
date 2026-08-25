@@ -16,8 +16,8 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 | `count` | `number` | `3500` | Major (morphing) particles. Set to `0` for an ambient-only field. |
 | `minorCount` | `number` | `260` | Ambient drift particles. These never morph. |
 | `mode` | `'background' \| 'container' \| 'page'` | `'background'` | Canvas positioning and pointer scope. See [Modes](#modes). |
-| `color` | `string` | `'#4f9c7d'` | Hex, `rgb()`, or `rgba()`. Applies to major and emission particles. |
-| `minorColor` | `string \| null` | `null` | Ambient layer colour. `null` inherits `color`. |
+| `color` | `ColorSpec` | `'#4f9c7d'` | A CSS colour string, a ramp across the field, or the source SVG's own fills. See [Colour](#colour). |
+| `minorColor` | `ColorSpec \| null` | `null` | Ambient layer colour. `null` inherits `color`. A ramp collapses to its `from`. |
 | `background` | `string` | `''` | CSS background applied to the canvas. Empty keeps it transparent. |
 | `opacity` | `number` | `1` | Global multiplier over every particle's alpha. |
 | `blend` | `'normal' \| 'additive'` | `'normal'` | `additive` makes overlapping particles glow. Best on dark backgrounds. |
@@ -29,7 +29,8 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 | `autoPause` | `boolean` | `true` | Stop the loop when the canvas is offscreen or the tab is hidden. |
 | `reducedMotion` | `'respect' \| 'ignore'` | `'respect'` | `respect` renders one static frame when the user prefers reduced motion. |
 | `adaptiveQuality` | `boolean` | `true` | Drop render resolution when frame time exceeds the budget. |
-| `behaviors` | `Behavior[] \| null` | `null` | Replace the simulation pipeline. `null` uses the defaults. |
+| `assign` | `AssignMode \| AssignFn` | `'angular'` | How particles pair with shape points. |
+| `behaviors` | `Behavior[] \| null` | `null` | Replace the simulation pipeline. `null` uses the defaults. Each entry may declare a `phase`. |
 | `backend` | `() => SimulationBackend \| null` | `null` | Swap the simulation backend. |
 | `onReady` | `(instance) => void \| null` | `null` | Fires once the instance is constructed. |
 | `onError` | `(error) => void \| null` | `null` | Fires on WebGL2 failure and async shape-loading errors. |
@@ -55,57 +56,136 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 | `damping` | `number` | `0.97` | Velocity retention while morphing. |
 | `twinkle` | `number` | `0.18` | Brightness flicker amplitude when shaped. |
 | `depth` | `number` | `0.8` | How strongly z position scales size and brightness while dispersed. |
+| `settle` | `number` | `0.1` | Follow strength once fully morphed and undisturbed. A steady state, not a transition — which is why it lives here. |
 
 `follow` and `followSpread` are frame-rate normalised, so the motion looks the same at 60 Hz and 144 Hz.
 
 ---
 
-## `transition` — how the morph moves
+## `assign` — pairing particles with shape points
 
-| option | type | default | description |
-|---|---|---|---|
-| `speed` | `number` | `0.014` | Rate the morph scalar approaches its target. |
-| `easing` | `(t: number) => number` | `easeInOutCubic` | Shapes the interpolation curve. |
-| `assign` | `'angular' \| 'index' \| 'random'` | `'angular'` | How particles are paired with sampled shape points. |
-| `settle` | `number` | `0.1` | Follow strength once fully morphed and undisturbed. |
-| `stagger` | `number` | `0.38` | Spreads particle departure times across the transition, so the shape assembles progressively instead of every particle arriving at once. `0` disables it. |
-| `order` | `'random' \| 'x' \| 'y' \| 'radial' \| 'angular'` | `'radial'` | How the stagger delays are ordered. `random` scatters them; the spatial orders turn the stagger into a directional wipe. |
-| `sweep` | `number` | `0.9` | Brightness and size boost applied to particles as the stagger wave reaches them. `0` disables the flash. |
-| `sweepWidth` | `number` | `0.22` | Width of the flashing band, in morph units. Narrow is a crisp wave, wide is a soft glow. |
-| `turbulence` | `number` | `16` | Noise displacement applied to particles while in flight, peaking mid-transition and fading to zero on arrival. |
+`assign` is a **top-level option**, not part of `transition`. It decides *which* target each particle gets, and it applies every time a shape is set — entering, or swapping one shape for another. The choreography decides *how* they travel; this decides *where*.
 
-### The sweep
+| value | description |
+|---|---|
+| `'angular'` | Sorts both the dispersed particles and the sampled shape points by angle around their centroids, then pairs them in order. Particles travel far shorter distances and the shape snaps into focus instead of churning. For two concentric rings this reaches the mathematically optimal pairing. |
+| `'index'` | Pairs by array order — cheapest, and useful when you generate shape points yourself in a meaningful sequence. |
+| `'random'` | Pairs each particle with an arbitrary shape point, so a particle on the left of the sphere may fly to the right of the shape. The result is a scramble. |
+| `AssignFn` | Your own pairing. Receives the sampled points and the spread positions, and writes targets into the output arrays. |
 
-With `stagger` above zero and `sweep` above zero, a wave travels across the field in the direction set by `order`, and each particle launches toward the shape as the wave reaches it — brightening and swelling as it goes. The shape appears to be conjured rather than interpolated.
+---
+
+## `transition` — how a move is performed
+
+A move between states is a **choreography**. There are three places one can run, and they all take the same shape:
+
+| slot | when it runs |
+|---|---|
+| `enter` | spread → shape |
+| `exit` | shape → spread. `'mirror'` reuses `enter` at 45% of its speed. |
+| `swap` | shape → shape. `'none'` retargets instantly, with no interpolation. |
 
 ```ts
 stipple.setOptions({
-  transition: { stagger: 0.75, order: 'y', sweep: 1, sweepWidth: 0.15 },
+  transition: {
+    enter: 'sweep',
+    exit: 'mirror',
+    swap: 'burst',
+  },
 });
 ```
 
-`order: 'radial'` reads as the shape condensing from the centre out, `'y'` as a top-to-bottom wipe, `'angular'` as a radar sweep. Set `sweep: 0` to keep the staggered assembly without the flash.
+### Named choreographies
 
-### `assign` matters more than it looks
+| name | what it does |
+|---|---|
+| `'uniform'` | Everything moves together. **This is how you turn the wipe off.** |
+| `'sweep'` | A directional wipe. The default for `enter` and `swap`. |
+| `'burst'` | Centre-out, fast out of the gate, with a flash on the wavefront. |
 
-`random` pairs each particle with an arbitrary shape point, so a particle on the left of the sphere may fly to the right of the shape. The result is a scramble.
+### Writing one out
 
-`angular` sorts both the dispersed particles and the sampled shape points by angle around their centroids, then pairs them in order. Particles travel far shorter distances and the shape snaps into focus instead of churning. For two concentric rings this reaches the mathematically optimal pairing.
+Any slot also accepts an object. Anything you leave out falls back to the `sweep` baseline.
 
-`index` pairs by array order — cheapest, and useful when you generate shape points yourself in a meaningful sequence.
+| option | type | default | description |
+|---|---|---|---|
+| `speed` | `number` | `0.014` | Rate the progress value approaches its target, per frame at 60fps. |
+| `easing` | `Easing \| EasingName` | `easeInOutCubic` | Curve applied to each particle's own flight. |
+| `stagger` | `number` | `0.82` | How far apart launch times are pushed, 0 to 0.9. |
+| `order` | `'random' \| 'x' \| 'y' \| 'radial' \| 'radar'` | `'x'` | Which direction the wavefront travels. Ignored when `stagger` is 0. |
+| `turbulence` | `number` | `16` | Noise displacement while in flight, peaking mid-move and fading on arrival. |
+| `flash` | `number` | `0` | Brightness and size boost on particles the wavefront is crossing. |
+| `flashWidth` | `number` | `0.22` | Width of the flashing band, in progress units. |
+
+### The sweep is `stagger` and `order`
+
+Nothing else. `order` derives each particle's launch time from where it sits in the field; `stagger` decides how far apart those launch times are pushed. A wave then travels across the field in that direction, and each particle launches toward the shape as the wave reaches it.
+
+The two numbers work against each other, which is the part worth internalising:
+
+```
+launch = delay * stagger        // when this particle leaves,  0 .. stagger
+span   = 1 - stagger            // how long its own flight lasts
+```
+
+Push `stagger` up and launches spread wide while each flight gets short, so only a narrow band is ever moving — a crisp wipe. Pull it down and every particle is in flight almost the whole time, which reads as the whole field arriving at once no matter what `order` says. At the default `0.82` roughly a third of the field is moving at the busiest moment; at `0.38` it is effectively all of it.
+
+`order: 'x'` is a left-to-right wipe, `'y'` top-to-bottom, `'radial'` reads as the shape condensing from the centre out, and `'radar'` sweeps around like a radar hand.
+
+> `order: 'radar'` was called `'angular'` before v0.2. It was renamed because `assign: 'angular'` is an unrelated mechanism, and having the same word mean two things in adjacent options was a trap.
+
+`flash` is a separate, optional flourish layered on top, off by default. Turning it up makes the flash the thing you notice instead of the wipe, so reach for it only when you want that.
+
+### Swapping one shape for another
+
+When a shape is already on screen and you set another, the `swap` choreography interpolates between them. The outgoing targets are held in their own buffer, so this is a real move rather than a retarget.
+
+```ts
+await stipple.morphTo(logoA);
+await stipple.morphTo(logoB);                    // swaps, using transition.swap
+await stipple.morphTo(logoC, { swap: 'none' });  // instant retarget
+```
+
+A swap runs on its own clock and composes with the morph: you can swap while the field is only half-formed, and both progress independently.
+
+### Easing by name
 
 `easing` accepts either a function or the name of a built-in:
 
 ```ts
-stipple.setOptions({ transition: { easing: 'outExpo' } });
+stipple.setOptions({ transition: { enter: { easing: 'outExpo' } } });
 
 import { easeOutExpo } from 'stipple-gl';
-stipple.setOptions({ transition: { easing: easeOutExpo } });
+stipple.setOptions({ transition: { enter: { easing: easeOutExpo } } });
 ```
 
 Names: `linear` · `inOutCubic` · `inOutQuad` · `outExpo` · `outBack` · `inOutElastic`.
 
 Prefer the name. It is shorter, it tree-shakes the same, and it is the only form that survives [worker mode](worker.md), where functions cannot cross the thread boundary.
+
+---
+
+## Colour
+
+`color` accepts three forms.
+
+```ts
+color: '#4f9c7d'                                             // solid
+color: { type: 'ramp', from: '#0ea5e9', to: '#f472b6', by: 'depth' }
+color: { type: 'shape', fallback: '#4f9c7d' }                 // the SVG's own fills
+```
+
+A **ramp** spreads two colours across the field. `by` picks what drives the gradient:
+
+| `by` | gradient runs |
+|---|---|
+| `'depth'` | back to front through the sphere |
+| `'radius'` | centre outward |
+| `'index'` | in particle order |
+
+The ramp position is precomputed once per layout, so this costs three lerps per particle per frame and nothing else.
+
+A **shape** source reads each particle's colour from the pixel it was sampled from, so the field takes on the artwork's own palette. `fallback` is used while dispersed and for any SVG that carries no fills — the colour fades from `fallback` into the sampled colour as the shape forms, and interpolates again across a swap.
 
 ---
 
@@ -189,3 +269,25 @@ Fire a wave programmatically with `stipple.pulse(x, y, strength)`.
 | `speed` | `number` | `1.35` | Oscillation rate. |
 
 The wobble is depth-weighted, so particles further back move more, which reads as volume. It damps to 45% while the pointer is active so interaction stays legible.
+
+---
+
+## `ShapeConfig` — what a shape carries
+
+`setShape` and `morphTo` take a `ShapeConfig`. Build one with the helpers rather than by hand.
+
+| field | type | description |
+|---|---|---|
+| `paths` | `SVGPathData[]` | Vector geometry. Empty for a raster-backed shape. |
+| `image` | `ImageSource` | A raster source — `ImageBitmap`, `<img>`, `<canvas>`, `<video>`, `OffscreenCanvas`. Takes precedence over `paths`. |
+| `mask` | `'alpha' \| 'dark' \| 'light'` | Which pixels of `image` count as ink. Default `'alpha'`. |
+| `threshold` | `number` | Cutoff for `mask`, 0..1. Defaults to `0.03` for alpha, `0.5` otherwise. |
+| `detail` | `'uniform' \| 'edges' \| 'density'` | Where the particle budget goes. Default `'uniform'`. Use `'edges'` for flat-filled illustrations. |
+| `detailStrength` | `number` | How hard `detail` is applied, 0..1. Default `0.85`. |
+| `viewBox` | `string` | Source coordinate system, for the vector route. |
+| `scale` | `number` | Size relative to the canvas. |
+| `position` | `XY` | Centre, in 0..1 canvas coordinates. |
+| `count` | `number` | Cap on sampled points, clamped to the field's `count`. |
+| `color` | `string` | Tint the field takes on while morphed into this shape. |
+
+See [images.md](images.md) for the formats, the masks, and when SVG is rasterised.

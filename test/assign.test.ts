@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { assignTargets } from '../src/sources/assign';
 import { defaultOptions, mergeOptions, resolveOptions } from '../src/core/options';
+import { resolveChoreography } from '../src/core/choreography';
 
 const ring = (count: number, cx: number, cy: number, radius: number): Float32Array => {
   const out = new Float32Array(count * 2);
@@ -166,9 +167,9 @@ describe('mergeOptions', () => {
 
   it('keeps functions intact', () => {
     const easing = (t: number) => t;
-    const merged = resolveOptions({ transition: { easing } });
-    expect(merged.transition.easing).toBe(easing);
-    expect(merged.transition.speed).toBe(defaultOptions.transition.speed);
+    const merged = resolveOptions({ transition: { enter: { easing } } });
+    expect((merged.transition.enter as { easing: unknown }).easing).toBe(easing);
+    expect(resolveChoreography(merged.transition.enter).speed).toBe(resolveChoreography(defaultOptions.transition.enter).speed);
   });
 
   it('ignores undefined but honours explicit null', () => {

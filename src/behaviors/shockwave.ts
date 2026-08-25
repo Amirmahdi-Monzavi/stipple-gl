@@ -2,6 +2,7 @@ import type { Behavior, SimContext } from '../core/types';
 
 export const createShockwaveBehavior = (): Behavior => ({
   name: 'shockwave',
+  phase: 'force',
   order: 40,
   step(ctx: SimContext): void {
     const { major, options, state } = ctx;

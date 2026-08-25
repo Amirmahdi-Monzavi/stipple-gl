@@ -1,3 +1,4 @@
+import { solidColor } from '../core/color';
 import { noise2, parseColor, rand } from '../core/math';
 import type { Behavior, EmissionState, SimContext } from '../core/types';
 
@@ -58,6 +59,7 @@ const remove = (emission: EmissionState, i: number): void => {
 
 export const createEmissionBehavior = (): Behavior => ({
   name: 'emission',
+  phase: 'ambient',
   order: 70,
   step(ctx: SimContext): void {
     const { emission, major, options, state } = ctx;
@@ -70,7 +72,7 @@ export const createEmissionBehavior = (): Behavior => ({
     const spread = state.morph < 0.1;
     const engaged = state.morph > 0.985;
     const limit = Math.min(config.max, emission.capacity);
-    const [r, g, b] = parseColor(options.color);
+    const [r, g, b] = parseColor(solidColor(options.color));
 
     if (engaged && emission.count < limit) {
       const rate = config.rate;

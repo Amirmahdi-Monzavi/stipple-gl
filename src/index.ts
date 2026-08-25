@@ -3,6 +3,14 @@ export { StippleCore } from './core/engine';
 export type { StippleTarget } from './core/engine';
 
 export { defaultOptions, resolveOptions, mergeOptions, responsiveCount } from './core/options';
+export {
+  baseChoreography,
+  resolveChoreography,
+  mirrorChoreography,
+  isChoreographyName,
+} from './core/choreography';
+export { solidColor, isRamp, isShapeColor } from './core/color';
+export { PHASE_ORDER, behaviorOrder, sortBehaviors } from './core/pipeline';
 
 export {
   clamp,
@@ -42,14 +50,34 @@ export { parseSVG, loadSVG, clearSVGCache, parseTransform, shapeElementToPath } 
 export { sampleShape, shapeBounds, releaseRaster, defaultSampleSettings } from './sources/sample';
 export type { SampleSettings } from './sources/sample';
 export { assignTargets, releaseAssignScratch } from './sources/assign';
-export type { AssignMode } from './sources/assign';
 
 export { shapeFromSVG, shapeFromString, shapeFromURL, fitShapeToElement } from './sources/shape';
+export {
+  imageFromURL,
+  imageFromBlob,
+  rasterizeSVG,
+  shapeFromImage,
+  shapeFromImageURL,
+  shapeFromSVGImage,
+  shapeFromFile,
+  svgNeedsRaster,
+} from './sources/image';
+export type { ImageShapeOverrides } from './sources/image';
 export { shapeSupport } from './sources/support';
 
 export type {
+  AssignFn,
+  AssignMode,
   Behavior,
+  BehaviorPhase,
   BlendMode,
+  Camera,
+  Choreography,
+  ChoreographyConfig,
+  ChoreographyName,
+  ColorSpec,
+  ImageMask,
+  ImageSource,
   DeepPartial,
   Easing,
   EasingName,
@@ -59,15 +87,20 @@ export type {
   MajorOptions,
   Matrix,
   MinorOptions,
+  MorphOptions,
   PackTarget,
   PointerOptions,
   PointerState,
   RGB,
   RenderMode,
+  ResolvedChoreographies,
   SVGPathData,
+  SampledShape,
   SVGShapeData,
   ShapeConfig,
   Shockwave,
+  StippleEvent,
+  StippleEventMap,
   SimContext,
   ShapeSupport,
   SimulationBackend,

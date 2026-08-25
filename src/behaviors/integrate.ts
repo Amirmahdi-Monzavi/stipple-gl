@@ -2,6 +2,7 @@ import type { Behavior, SimContext } from '../core/types';
 
 export const createIntegrateBehavior = (): Behavior => ({
   name: 'integrate',
+  phase: 'integrate',
   order: 50,
   step(ctx: SimContext): void {
     const { major, options, state } = ctx;
@@ -17,7 +18,7 @@ export const createIntegrateBehavior = (): Behavior => ({
     if (engaged && disturbed) {
       follow = Math.max(follow, 0.22);
     } else if (morph > 0.999) {
-      follow = options.transition.settle;
+      follow = options.major.settle;
     }
 
     follow = 1 - Math.pow(1 - follow, state.dtScale);

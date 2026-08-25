@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { droppedKeys, sanitizeConfig } from '../src/worker/protocol';
 import { easings, resolveEasing, easeInOutCubic } from '../src/core/math';
 import { resolveOptions } from '../src/core/options';
+import { resolveChoreography } from '../src/core/choreography';
 
 describe('sanitizeConfig', () => {
   it('keeps plain values intact', () => {
@@ -22,7 +23,7 @@ describe('sanitizeConfig', () => {
   it('survives structuredClone, which postMessage requires', () => {
     const result = sanitizeConfig({
       count: 1200,
-      transition: { easing: 'outExpo', stagger: 0.4 },
+      transition: { enter: { easing: 'outExpo', stagger: 0.4 } },
       emission: { burst: [2, 5] },
     });
 
@@ -33,14 +34,14 @@ describe('sanitizeConfig', () => {
   it('drops function-valued options and reports them', () => {
     const result = sanitizeConfig({
       count: 100,
-      transition: { easing: (t: number) => t },
+      transition: { enter: { easing: (t: number) => t } },
       onReady: () => undefined,
       onError: () => undefined,
     });
 
-    expect(result.transition).toEqual({});
+    expect(result.transition).toEqual({ enter: {} });
     expect('onReady' in result).toBe(false);
-    expect(droppedKeys).toContain('transition.easing');
+    expect(droppedKeys).toContain('transition.enter.easing');
     expect(droppedKeys).toContain('onReady');
     expect(() => structuredClone(result)).not.toThrow();
   });
@@ -58,9 +59,9 @@ describe('sanitizeConfig', () => {
   });
 
   it('preserves a named easing so the worker can rebuild it', () => {
-    const result = sanitizeConfig({ transition: { easing: 'outBack' } });
-    expect(result.transition?.easing).toBe('outBack');
-    expect(droppedKeys).not.toContain('transition.easing');
+    const result = sanitizeConfig({ transition: { enter: { easing: 'outBack' } } });
+    expect((result.transition?.enter as { easing?: string })?.easing).toBe('outBack');
+    expect(droppedKeys).not.toContain('transition.enter.easing');
   });
 
   it('reports nothing dropped for an already-serialisable config', () => {
@@ -91,7 +92,7 @@ describe('resolveEasing', () => {
   });
 
   it('accepts a named easing through the options pipeline', () => {
-    const options = resolveOptions({ transition: { easing: 'outExpo' } });
-    expect(resolveEasing(options.transition.easing)).toBe(easings.outExpo);
+    const options = resolveOptions({ transition: { enter: { easing: 'outExpo' } } });
+    expect(resolveEasing(resolveChoreography(options.transition.enter).easing)).toBe(easings.outExpo);
   });
 });

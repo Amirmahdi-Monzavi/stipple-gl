@@ -1,6 +1,7 @@
 import { shapeBounds } from './sample';
+import type { AssignFn, AssignMode } from '../core/types';
 
-export type AssignMode = 'angular' | 'index' | 'random';
+export type { AssignMode } from '../core/types';
 
 let angleScratch = new Float64Array(0);
 let orderScratch = new Uint32Array(0);
@@ -38,7 +39,7 @@ export const releaseAssignScratch = (): void => {
 };
 
 export const assignTargets = (
-  mode: AssignMode,
+  mode: AssignMode | AssignFn,
   points: Float32Array,
   count: number,
   spreadX: Float32Array,
@@ -47,26 +48,37 @@ export const assignTargets = (
   outY: Float32Array,
   outZ: Float32Array,
   depth: number,
+  order?: Uint32Array,
 ): void => {
   const available = points.length >> 1;
   if (available === 0 || count === 0) return;
 
+  // A caller-supplied pairing gets full control. We cannot know which source
+  // point it picked, so shape colours fall back to identity order.
+  if (typeof mode === 'function') {
+    mode(points, count, spreadX, spreadY, outX, outY, outZ, depth);
+    if (order) for (let i = 0; i < count; i++) order[i] = i % available;
+    return;
+  }
+
   if (mode === 'index') {
     for (let i = 0; i < count; i++) {
-      const source = (i % available) * 2;
-      outX[i] = points[source]!;
-      outY[i] = points[source + 1]!;
+      const pick = i % available;
+      outX[i] = points[pick * 2]!;
+      outY[i] = points[pick * 2 + 1]!;
       outZ[i] = (Math.random() - 0.5) * depth;
+      if (order) order[i] = pick;
     }
     return;
   }
 
   if (mode === 'random') {
     for (let i = 0; i < count; i++) {
-      const source = ((Math.random() * available) | 0) * 2;
-      outX[i] = points[source]!;
-      outY[i] = points[source + 1]!;
+      const pick = (Math.random() * available) | 0;
+      outX[i] = points[pick * 2]!;
+      outY[i] = points[pick * 2 + 1]!;
       outZ[i] = (Math.random() - 0.5) * depth;
+      if (order) order[i] = pick;
     }
     return;
   }
@@ -112,9 +124,10 @@ export const assignTargets = (
 
   for (let i = 0; i < count; i++) {
     const particle = particleIndices[i]!;
-    const source = shapeOrder[shapeIndices[i]!]! * 2;
-    outX[particle] = points[source]!;
-    outY[particle] = points[source + 1]!;
+    const pick = shapeOrder[shapeIndices[i]!]!;
+    outX[particle] = points[pick * 2]!;
+    outY[particle] = points[pick * 2 + 1]!;
     outZ[particle] = (Math.random() - 0.5) * depth;
+    if (order) order[particle] = pick;
   }
 };

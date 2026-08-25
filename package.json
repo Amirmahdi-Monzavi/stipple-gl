@@ -61,6 +61,10 @@
     },
     "./worker/thread": {
       "import": "./dist/thread.js"
+    },
+    "./global": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/stipple.global.js"
     }
   },
   "scripts": {
@@ -109,25 +113,30 @@
       "name": "lite (particles only)",
       "path": "dist/lite.js",
       "import": "{ Stipple }",
-      "limit": "10 kB"
+      "limit": "13 kB"
     },
     {
       "name": "core (engine + SVG morphing)",
       "path": "dist/index.js",
       "import": "{ Stipple }",
-      "limit": "13 kB"
+      "limit": "18 kB"
     },
     {
       "name": "core + react binding",
       "path": "dist/react.js",
       "import": "{ Particles }",
-      "limit": "14 kB"
+      "limit": "19 kB"
     },
     {
       "name": "scroll module",
       "path": "dist/scroll.js",
       "import": "{ createScrollMorph }",
       "limit": "3 kB"
+    },
+    {
+      "name": "script tag (iife, minified)",
+      "path": "dist/stipple.global.js",
+      "limit": "19 kB"
     }
   ],
   "engines": {
@@ -140,5 +149,7 @@
   "homepage": "https://github.com/amirmahdikaren/stipple-gl#readme",
   "bugs": {
     "url": "https://github.com/amirmahdikaren/stipple-gl/issues"
-  }
+  },
+  "unpkg": "./dist/stipple.global.js",
+  "jsdelivr": "./dist/stipple.global.js"
 }
