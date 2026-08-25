@@ -69,7 +69,22 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 | `assign` | `'angular' \| 'index' \| 'random'` | `'angular'` | How particles are paired with sampled shape points. |
 | `settle` | `number` | `0.1` | Follow strength once fully morphed and undisturbed. |
 | `stagger` | `number` | `0.38` | Spreads particle departure times across the transition, so the shape assembles progressively instead of every particle arriving at once. `0` disables it. |
+| `order` | `'random' \| 'x' \| 'y' \| 'radial' \| 'angular'` | `'radial'` | How the stagger delays are ordered. `random` scatters them; the spatial orders turn the stagger into a directional wipe. |
+| `sweep` | `number` | `0.9` | Brightness and size boost applied to particles as the stagger wave reaches them. `0` disables the flash. |
+| `sweepWidth` | `number` | `0.22` | Width of the flashing band, in morph units. Narrow is a crisp wave, wide is a soft glow. |
 | `turbulence` | `number` | `16` | Noise displacement applied to particles while in flight, peaking mid-transition and fading to zero on arrival. |
+
+### The sweep
+
+With `stagger` above zero and `sweep` above zero, a wave travels across the field in the direction set by `order`, and each particle launches toward the shape as the wave reaches it — brightening and swelling as it goes. The shape appears to be conjured rather than interpolated.
+
+```ts
+stipple.setOptions({
+  transition: { stagger: 0.75, order: 'y', sweep: 1, sweepWidth: 0.15 },
+});
+```
+
+`order: 'radial'` reads as the shape condensing from the centre out, `'y'` as a top-to-bottom wipe, `'angular'` as a radar sweep. Set `sweep: 0` to keep the staggered assembly without the flash.
 
 ### `assign` matters more than it looks
 
@@ -79,12 +94,18 @@ stipple.setOptions({ jelly: { intensity: 0 } });
 
 `index` pairs by array order — cheapest, and useful when you generate shape points yourself in a meaningful sequence.
 
-Easings ship as named exports:
+`easing` accepts either a function or the name of a built-in:
 
 ```ts
-import { easings, easeOutExpo } from 'stipple-gl';
-// linear · inOutCubic · inOutQuad · outExpo · outBack · inOutElastic
+stipple.setOptions({ transition: { easing: 'outExpo' } });
+
+import { easeOutExpo } from 'stipple-gl';
+stipple.setOptions({ transition: { easing: easeOutExpo } });
 ```
+
+Names: `linear` · `inOutCubic` · `inOutQuad` · `outExpo` · `outBack` · `inOutElastic`.
+
+Prefer the name. It is shorter, it tree-shakes the same, and it is the only form that survives [worker mode](worker.md), where functions cannot cross the thread boundary.
 
 ---
 
