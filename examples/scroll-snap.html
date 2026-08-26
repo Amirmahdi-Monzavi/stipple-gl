@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="favicon.svg" />
+    <title>stipple-gl — a shape per section</title>
+
+    <style>
+      :root {
+        --ink: #eaf0f8;
+        --muted: #8496ad;
+        --ground: #070a10;
+        --accent: #f2b45e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-snap-type: y mandatory;
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font:
+          16px/1.65 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      /*
+        The field is fixed behind the page. Sections scroll over it and each one
+        declares the shape it wants; the controller cross-fades between them.
+      */
+      #field {
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+      }
+
+      section {
+        position: relative;
+        z-index: 1;
+        min-height: 100vh;
+        scroll-snap-align: start;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 clamp(24px, 8vw, 120px);
+        max-width: 46ch;
+      }
+
+      .step {
+        font-size: 11.5px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 12px;
+      }
+
+      h2 {
+        margin: 0 0 14px;
+        font-size: clamp(28px, 4.4vw, 46px);
+        line-height: 1.1;
+        letter-spacing: -0.025em;
+        font-weight: 600;
+        text-wrap: balance;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15.5px;
+      }
+
+      .hint {
+        position: fixed;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%);
+        z-index: 2;
+        font-size: 12px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #5b6a80;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="field"></div>
+
+    <!--
+      The only wiring in the markup: each section names its shape. The default
+      attribute is `data-stipple-shape`; `none` releases back to the spread.
+    -->
+    <section data-stipple-shape="none">
+      <p class="step">scroll</p>
+      <h2>Nothing yet.</h2>
+      <p>The field rests in its dispersed state until a section asks for something.</p>
+    </section>
+
+    <section data-stipple-shape="hex">
+      <p class="step">section two</p>
+      <h2>A shape arrives.</h2>
+      <p>
+        Crossing into a section morphs the field. The controller watches intersection, not scroll
+        offset, so it costs nothing while you sit still.
+      </p>
+    </section>
+
+    <section data-stipple-shape="bolt">
+      <p class="step">section three</p>
+      <h2>And another.</h2>
+      <p>
+        Shape to shape runs its own choreography, separate from the one used to arrive from the
+        spread.
+      </p>
+    </section>
+
+    <section data-stipple-shape="none">
+      <p class="step">section four</p>
+      <h2>Back to rest.</h2>
+      <p>Naming <code>none</code> releases the shape and the field disperses again.</p>
+    </section>
+
+    <p class="hint">scroll</p>
+
+    <script src="../dist/stipple.global.js"></script>
+    <script>
+      const { Stipple, shapeFromString, createScrollMorph, isSupported } = window.stipple;
+
+      if (isSupported()) {
+        const field = new Stipple(document.getElementById('field'), {
+          mode: 'container',
+          count: 3000,
+          color: { type: 'ramp', from: '#f2b45e', to: '#d4553f', by: 'depth' },
+          background: 'transparent',
+        });
+
+        const svg = (paths) => shapeFromString(`<svg viewBox="0 0 100 100">${paths}</svg>`);
+
+        const controller = createScrollMorph(field, {
+          sections: 'section',
+          shapes: {
+            none: null,
+            hex: svg('<path d="M50 4 L93 27 V73 L50 96 L7 73 V27 Z" fill="#f2b45e"/>'),
+            bolt: svg('<path d="M56 4 L20 56 H44 L38 96 L80 40 H54 Z" fill="#f2b45e"/>'),
+          },
+          onChange: (key) => {
+            document.querySelector('.hint').textContent = key && key !== 'none' ? key : 'scroll';
+          },
+        });
+
+        window.field = field;
+        window.controller = controller;
+      }
+    </script>
+  </body>
+</html>

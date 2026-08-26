@@ -472,10 +472,62 @@ document.getElementById('copy')!.addEventListener('click', () => {
     output[key] = value;
   }
 
-  const text = 'const config = ' + JSON.stringify(output, null, 2) + ';';
+  // Emit a file, not the middle of one. An options object on its own leaves the
+  // reader to work out the import, the host element and the shape call — which
+  // is most of the distance between the playground and something on their page.
+  const source = activeShape && activeShape !== 'none' ? shapes[activeShape] : undefined;
+  const inlineable = source !== undefined && source.length <= 1500;
+
+  const imports = ['Stipple'];
+  if (inlineable) imports.push('shapeFromString');
+
+  const lines = [
+    'import { ' + imports.join(', ') + " } from 'stipple-gl';",
+    '',
+    'const config = ' + JSON.stringify(output, null, 2) + ';',
+    '',
+  ];
+
+  if (output['mode'] === 'container') {
+    lines.push(
+      '// A container field fills its host, so #stage needs a height of its own',
+      '// and a position other than static.',
+    );
+  }
+
+  lines.push("const field = new Stipple('#stage', config);", '');
+
+  if (inlineable) {
+    lines.push(
+      'const shape = shapeFromString(',
+      '  `' + source.replace(/`/g, '\\`') + '`,',
+      '  ' +
+        JSON.stringify({
+          scale: 0.62,
+          position: { x: 0.5, y: 0.5 },
+          detail,
+          detailStrength,
+        }) +
+        ',',
+      ');',
+      '',
+      'field.morphTo(shape);',
+    );
+  } else if (customShape) {
+    lines.push(
+      '// The shape on screen came from a file you dropped in. Load your own with',
+      '// shapeFromFile(file) or shapeFromURL(url), then: field.morphTo(shape).',
+    );
+  } else if (source !== undefined) {
+    lines.push(
+      '// This shape is too large to paste inline. Save it as an .svg and use',
+      "// shapeFromURL('/shape.svg'), then: field.morphTo(shape).",
+    );
+  }
+
   void navigator.clipboard
-    .writeText(text)
-    .then(() => toast('Config copied to clipboard'))
+    .writeText(lines.join('\n') + '\n')
+    .then(() => toast(inlineable ? 'Runnable snippet copied' : 'Config copied to clipboard'))
     .catch(() => toast('Clipboard blocked by the browser'));
 });
 

@@ -2,6 +2,8 @@
 
 A WebGL2 particle field that morphs into any SVG.
 
+![A particle field dispersing, gathering into a hexagon, morphing into a spirograph, and dispersing again](docs/hero.gif)
+
 Zero dependencies. Framework agnostic. **12.4 KB gzipped** for a particle background, 17.9 KB with SVG morphing, raster image sources and every behaviour.
 
 Optionally runs the whole simulation on a **Web Worker**, so it costs the main thread nothing.

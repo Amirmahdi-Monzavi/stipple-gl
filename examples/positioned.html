@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="favicon.svg" />
+    <title>stipple-gl — putting the shape where you want it</title>
+
+    <style>
+      :root {
+        --ink: #eef2f7;
+        --muted: #8d9cb2;
+        --ground: #080b11;
+        --line: #1c2635;
+        --accent: #7ee0c8;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--ground);
+        color: var(--ink);
+        font:
+          16px/1.65 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      /*
+        The field covers the whole hero. The shape is then placed inside it by
+        pointing `fitShapeToElement` at a slot element, so the layout stays
+        ordinary CSS and the particles follow it.
+      */
+      .hero {
+        position: relative;
+        min-height: 100vh;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        gap: 40px;
+        padding: 48px clamp(24px, 6vw, 88px);
+      }
+
+      .copy {
+        position: relative;
+        z-index: 1;
+        max-width: 46ch;
+      }
+
+      .eyebrow {
+        font-size: 11.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 14px;
+      }
+
+      h1 {
+        margin: 0 0 16px;
+        font-size: clamp(30px, 4.6vw, 50px);
+        line-height: 1.08;
+        letter-spacing: -0.025em;
+        font-weight: 600;
+        text-wrap: balance;
+      }
+
+      p {
+        margin: 0 0 22px;
+        color: var(--muted);
+        font-size: 15.5px;
+      }
+
+      /* The slot is an ordinary empty box. Nothing is drawn into it directly. */
+      #slot {
+        position: relative;
+        aspect-ratio: 1;
+        width: min(100%, 420px);
+        justify-self: center;
+      }
+
+      #slot.show::after {
+        content: 'slot';
+        position: absolute;
+        inset: 0;
+        border: 1px dashed #35455c;
+        border-radius: 8px;
+        color: #56657c;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 7px 9px;
+      }
+
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink);
+        background: #141c28;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 7px 14px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: #2c3a4d;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      @media (max-width: 760px) {
+        .hero {
+          grid-template-columns: 1fr;
+          text-align: left;
+        }
+        #slot {
+          width: min(100%, 320px);
+          justify-self: start;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <section class="hero" id="hero">
+      <div class="copy">
+        <p class="eyebrow">shape placement</p>
+        <h1>The shape goes where the layout says.</h1>
+        <p>
+          The field spans this whole section, but the particles gather inside a slot on the right.
+          The slot is a plain empty element — resize the window and the shape follows it, because
+          its position is recomputed from the element's box.
+        </p>
+        <button id="toggle" aria-pressed="false">Show the slot</button>
+      </div>
+
+      <div id="slot"></div>
+    </section>
+
+    <script src="../dist/stipple.global.js"></script>
+    <script>
+      const { Stipple, shapeFromString, fitShapeToElement, isSupported } = window.stipple;
+
+      if (isSupported()) {
+        const hero = document.getElementById('hero');
+        const slot = document.getElementById('slot');
+
+        const field = new Stipple(hero, {
+          mode: 'container',
+          count: 3200,
+          color: { type: 'ramp', from: '#7ee0c8', to: '#3f7fd4', by: 'radius' },
+          background: 'transparent',
+        });
+
+        const source = `<svg viewBox="0 0 100 100">
+          <path d="M50 4 L93 27 V73 L50 96 L7 73 V27 Z" fill="none" stroke="#7ee0c8" stroke-width="4"/>
+          <path d="M50 26 L72 38 V62 L50 74 L28 62 V38 Z" fill="#7ee0c8"/>
+        </svg>`;
+
+        // `fitShapeToElement` reads the slot's box and the canvas's box and
+        // returns the same shape with `position` and `scale` filled in. It is a
+        // pure function, so it has to be re-run whenever either box changes.
+        const place = ({ animate = false } = {}) => {
+          const shape = fitShapeToElement(shapeFromString(source), slot, field.canvas);
+          // `morphTo` for the arrival — one call, and it runs the entry
+          // choreography. A re-place afterwards should just follow the slot.
+          if (animate) field.morphTo(shape);
+          else field.setShape(shape);
+        };
+
+        place({ animate: true });
+
+        // Debounced, because a resize fires continuously and each call re-samples.
+        let pending = 0;
+        addEventListener('resize', () => {
+          clearTimeout(pending);
+          pending = setTimeout(() => place(), 120);
+        });
+
+        const toggle = document.getElementById('toggle');
+        toggle.addEventListener('click', () => {
+          const shown = slot.classList.toggle('show');
+          toggle.setAttribute('aria-pressed', String(shown));
+          toggle.textContent = shown ? 'Hide the slot' : 'Show the slot';
+        });
+
+        window.field = field;
+      }
+    </script>
+  </body>
+</html>

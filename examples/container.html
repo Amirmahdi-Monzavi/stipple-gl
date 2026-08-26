@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="favicon.svg" />
+    <title>stipple-gl — a field inside a container</title>
+
+    <style>
+      :root {
+        --ink: #e8eef6;
+        --muted: #8b9bb0;
+        --ground: #0a0e14;
+        --card: #111823;
+        --line: #1e2836;
+        --accent: #5ec8f2;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--ground);
+        color: var(--ink);
+        font:
+          16px/1.6 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 32px 20px;
+      }
+
+      .card {
+        width: min(680px, 100%);
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+
+      /*
+        The one rule that matters. A container field fills its host, so the host
+        needs a height of its own and a position other than `static`. Without a
+        height this renders nothing at all — development builds warn about it.
+      */
+      #field {
+        position: relative;
+        height: 320px;
+        background: #0c121b;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .copy {
+        padding: 22px 26px 26px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 19px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14.5px;
+        max-width: 58ch;
+      }
+
+      .controls {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+
+      button {
+        font: inherit;
+        font-size: 13px;
+        color: var(--ink);
+        background: #18212e;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 6px 13px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: #2f3d50;
+      }
+      button[aria-pressed='true'] {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .fallback {
+        display: grid;
+        place-items: center;
+        height: 100%;
+        color: var(--muted);
+        font-size: 14px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="card">
+      <div id="field"></div>
+
+      <div class="copy">
+        <h1>A field inside a container</h1>
+        <p>
+          The canvas is bounded by the card above it rather than the viewport. Everything scrolls
+          and lays out normally around it.
+        </p>
+        <div class="controls" id="controls"></div>
+      </div>
+    </div>
+
+    <script src="../dist/stipple.global.js"></script>
+    <script>
+      const { Stipple, shapeFromString, isSupported } = window.stipple;
+
+      const host = document.getElementById('field');
+
+      // Branch before constructing, so an unsupported browser gets something
+      // rather than an exception.
+      if (!isSupported()) {
+        host.innerHTML = '<div class="fallback">WebGL2 is unavailable in this browser.</div>';
+      } else {
+        const svg = (paths) => `<svg viewBox="0 0 100 100">${paths}</svg>`;
+
+        const shapes = {
+          ring: svg(
+            '<path d="M50 6A44 44 0 1 1 49.9 6Z M50 23A27 27 0 1 0 50.1 23Z" fill="#5ec8f2" fill-rule="evenodd"/>',
+          ),
+          bolt: svg('<path d="M56 4 L20 56 H44 L38 96 L80 40 H54 Z" fill="#7ee0c8"/>'),
+          star: svg(
+            '<path d="M50 4 L61 36 L95 36 L67 56 L78 89 L50 68 L22 89 L33 56 L5 36 L39 36 Z" fill="#f2b45e"/>',
+          ),
+        };
+
+        const field = new Stipple(host, {
+          mode: 'container',
+          count: 2600,
+          color: '#5ec8f2',
+          background: 'transparent',
+        });
+
+        const controls = document.getElementById('controls');
+        let active = null;
+
+        const setActive = (key) => {
+          active = key;
+          for (const button of controls.children) {
+            button.setAttribute('aria-pressed', String(button.dataset.key === key));
+          }
+        };
+
+        for (const key of [...Object.keys(shapes), 'release']) {
+          const button = document.createElement('button');
+          button.textContent = key;
+          button.dataset.key = key;
+          button.addEventListener('click', () => {
+            if (key === 'release') {
+              field.release();
+              setActive(null);
+            } else {
+              field.morphTo(shapeFromString(shapes[key]));
+              setActive(key);
+            }
+          });
+          controls.appendChild(button);
+        }
+
+        // Handy when reading this with the console open.
+        window.field = field;
+
+        field.morphTo(shapeFromString(shapes.ring));
+        setActive('ring');
+      }
+    </script>
+  </body>
+</html>

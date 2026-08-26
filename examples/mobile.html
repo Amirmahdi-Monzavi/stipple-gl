@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="icon" href="favicon.svg" />
+    <title>stipple-gl — reflowing with the layout</title>
+
+    <style>
+      :root {
+        --ink: #edf2f8;
+        --muted: #8a99ae;
+        --ground: #06090e;
+        --panel: #0d131c;
+        --line: #1a2331;
+        --accent: #c98bf0;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        background: var(--ground);
+        color: var(--ink);
+        font:
+          16px/1.6 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        display: flex;
+        flex-direction: column;
+        padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+          env(safe-area-inset-left);
+      }
+
+      .bar {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .bar p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .bar b {
+        color: var(--ink);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .widths {
+        display: flex;
+        gap: 7px;
+        margin-left: auto;
+      }
+
+      button {
+        font: inherit;
+        font-size: 12.5px;
+        color: var(--ink);
+        background: #131b26;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 9px 15px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button[aria-pressed='true'] {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      /* The stage is what gets resized; the scene inside it is what reflows. */
+      .stage {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        justify-content: center;
+        padding: 18px;
+        overflow: auto;
+      }
+
+      /*
+        The container has to be an ancestor of what it governs: an element
+        cannot answer its own container query. So the width and `container-type`
+        live here, and the grid that responds to them lives on #scene inside.
+      */
+      .frame {
+        width: 100%;
+        max-width: var(--stage-width, 100%);
+        container-type: inline-size;
+        /*
+          Deliberately not animated. Animating the width fires a resize on every
+          frame of the transition, and the field has to re-place its shape on
+          each one — which is both wasteful and visibly stuttery. The reflow
+          reads more clearly as a single step anyway.
+        */
+      }
+
+      #scene {
+        position: relative;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        overflow: hidden;
+
+        display: grid;
+        grid-template-columns: 1fr;
+        align-items: center;
+        gap: 20px;
+        padding: 28px;
+      }
+
+      @container (min-width: 680px) {
+        #scene {
+          grid-template-columns: 1fr 1fr;
+          gap: 32px;
+          padding: 40px;
+        }
+        #slot {
+          min-height: 340px;
+        }
+      }
+
+      .copy {
+        position: relative;
+        z-index: 1;
+      }
+
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: var(--accent);
+        margin: 0 0 10px;
+      }
+
+      h1 {
+        margin: 0 0 12px;
+        font-size: clamp(22px, 5cqw, 34px);
+        line-height: 1.12;
+        letter-spacing: -0.02em;
+        font-weight: 600;
+        text-wrap: balance;
+      }
+
+      .copy p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14.5px;
+        max-width: 46ch;
+      }
+
+      /* An empty box. The shape is measured into it; nothing is drawn in it. */
+      #slot {
+        position: relative;
+        min-height: 220px;
+      }
+
+      #slot.show::after {
+        content: 'slot';
+        position: absolute;
+        inset: 0;
+        border: 1px dashed #3a2f4d;
+        border-radius: 10px;
+        color: #6b5b80;
+        font-size: 10.5px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 7px 9px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="bar">
+      <p>panel <b id="width">—</b> · particles <b id="count">—</b> · <b id="mode">—</b></p>
+      <div class="widths" id="widths"></div>
+    </div>
+
+    <div class="stage">
+      <div class="frame">
+        <div id="scene">
+          <div class="copy">
+            <p class="eyebrow">responsive</p>
+            <h1>The field follows the layout.</h1>
+            <p>
+              Narrow the panel and the columns stack, the slot moves under the text, and the
+              particles follow it there. The budget drops with it — fewer particles where they cost
+              more.
+            </p>
+          </div>
+
+          <div id="slot"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="../dist/stipple.global.js"></script>
+    <script>
+      const { Stipple, shapeFromString, fitShapeToElement, responsiveCount, isSupported } =
+        window.stipple;
+
+      if (isSupported()) {
+        const scene = document.getElementById('scene');
+        const slot = document.getElementById('slot');
+
+        // Budget from the element's own width, not the window's. A container
+        // field should size itself to its box, and it makes the panel widths
+        // below tell the truth instead of always reporting the desktop figure.
+        const budget = (width) =>
+          responsiveCount(
+            [
+              [520, 1400],
+              [900, 2600],
+            ],
+            4000,
+            width,
+          );
+
+        /*
+          The dispersed sphere is sized from the box's diagonal, which is longer
+          than the short axis of a wide panel — so its edges fall outside it.
+          Behind a full page that reads as intentional bleed; inside a bordered
+          panel it reads as a crop.
+
+          Deriving the radius from the shorter axis fixes it, with two caveats
+          worth knowing: `spread.zoom` scales the whole field afterwards, so it
+          has to be divided out, and `breathe` keeps expanding and contracting
+          around the result. Hence `zoom: 1` and the margin below.
+        */
+        const MARGIN = 0.82;
+        const fitRadius = (width, height) =>
+          Math.min(0.62, (Math.min(width, height) / Math.hypot(width, height)) * MARGIN);
+
+        const first = scene.getBoundingClientRect();
+
+        const field = new Stipple(scene, {
+          mode: 'container',
+          count: budget(first.width),
+          color: { type: 'ramp', from: '#c98bf0', to: '#5ec8f2', by: 'index' },
+          background: 'transparent',
+          // zoom magnifies the field after layout, which would undo the fit.
+          spread: { radius: fitRadius(first.width, first.height), zoom: 1 },
+        });
+
+        const source = `<svg viewBox="0 0 100 100">
+          <path d="M50 6 L86 20 V48 C86 70 70 86 50 94 C30 86 14 70 14 48 V20 Z"
+                fill="none" stroke="#c98bf0" stroke-width="5"/>
+          <path d="M38 50 L47 60 L64 40" fill="none" stroke="#c98bf0"
+                stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>`;
+
+        const report = (rect) => {
+          document.getElementById('width').textContent = Math.round(rect.width) + 'px';
+          document.getElementById('count').textContent = field.options.count.toLocaleString();
+          document.getElementById('mode').textContent =
+            rect.width >= 680 ? 'two columns' : 'stacked';
+        };
+
+        /*
+          Re-place the shape whenever the box changes.
+
+          The engine keeps the canvas matched to its host on its own — it has
+          its own ResizeObserver — so there is nothing to do about sizing here.
+          What it cannot know is that the shape is supposed to track a slot. A
+          shape's position is stored as a fraction of the canvas, so on a resize
+          the engine re-applies it faithfully to a box that has changed
+          proportions, and it lands somewhere that is no longer the slot.
+
+          So this runs synchronously rather than debounced. Both observers
+          deliver in the same batch, before anything is painted, which is what
+          keeps the correction from being visible as a second movement.
+        */
+        const place = ({ animate = false } = {}) => {
+          const rect = scene.getBoundingClientRect();
+          if (rect.width < 2 || rect.height < 2) return;
+
+          field.setOptions({ spread: { radius: fitRadius(rect.width, rect.height) } });
+          field.setCount(budget(rect.width));
+
+          const shape = fitShapeToElement(shapeFromString(source), slot, field.canvas);
+          // `morphTo` for the arrival, because it runs the entry choreography;
+          // `setShape` for a re-place, which should follow the slot rather than
+          // replay the entrance every time the panel changes width.
+          if (animate) field.morphTo(shape);
+          else field.setShape(shape);
+
+          report(rect);
+        };
+
+        place({ animate: true });
+
+        new ResizeObserver(() => place()).observe(scene);
+
+        const widths = document.getElementById('widths');
+
+        for (const [label, value] of [
+          ['Phone', '390px'],
+          ['Tablet', '760px'],
+          ['Full', '100%'],
+        ]) {
+          const button = document.createElement('button');
+          button.textContent = label;
+          button.setAttribute('aria-pressed', String(value === '100%'));
+          button.addEventListener('click', () => {
+            document.documentElement.style.setProperty('--stage-width', value);
+            for (const other of widths.children) {
+              other.setAttribute('aria-pressed', String(other === button));
+            }
+          });
+          widths.appendChild(button);
+        }
+
+        window.field = field;
+      }
+    </script>
+  </body>
+</html>

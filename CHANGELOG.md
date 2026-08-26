@@ -59,6 +59,17 @@ This release restructures the public API. Nothing is published yet, so the break
 - Scrollbar restyled and made cross-browser — `scrollbar-width`/`scrollbar-color` for Firefox alongside the WebKit pseudo-elements, with an inset thumb that keeps the full track grabbable.
 - A real page title and an SVG favicon.
 - A shape that fails to parse now surfaces as a toast instead of an uncaught error that takes the whole page down.
+- **"Copy config" emits a file rather than the middle of one.** It produced a bare options object, leaving the reader to work out the import, the host element and the shape call — most of the distance between the playground and their own page. It now writes the import line, the construction and, when a built-in shape is on screen, the `shapeFromString` call with the SVG inlined. Verified by running the copied text: only the bare-specifier import needs rewriting for a no-bundler context.
+
+### Examples
+
+- **Four standalone scenes in `examples/`**, each a finished thing rather than a control panel, loading the script-tag build by relative path so there is nothing to install or compile. `container.html` for a bounded field, `positioned.html` for `fitShapeToElement` aiming the shape at a layout slot, `scroll-snap.html` for `createScrollMorph`, and `mobile.html` for `responsiveCount`. Between them these were the only documented capabilities with no coverage of any kind; `visual/examples.spec.ts` now exercises all four in a real browser.
+- `pnpm examples` serves the repo root so they can be opened without a build step beyond `pnpm build`.
+- **`createScrollMorph` is in the script-tag build.** It costs 0.63 KB there rather than its 2.64 KB standalone figure because it shares the core, and the audience for that build is exactly the audience with no bundler to import it with. The image helpers stay out.
+
+### README
+
+- **A recorded loop at the top.** A morphing particle field cannot be evaluated from prose, and neither npm nor GitHub renders a canvas. `pnpm record-gif` drives the real engine frame by frame with a seeded generator and a frozen clock, so the result is identical on any machine, and encodes in the page — see `scripts/gif-encoder.js`. Dependency-free: there is no image tooling in this repo and none is being added for one asset. The GIF is excluded from the published tarball, which stays at 129 KB.
 
 ### Tooling
 

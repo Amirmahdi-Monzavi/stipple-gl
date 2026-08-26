@@ -42,10 +42,20 @@ export default defineConfig({
     ...(useSystemChrome ? { channel: 'chrome' } : {}),
   },
 
-  webServer: {
-    command: 'pnpm playground -- --port 5180 --strictPort',
-    url: 'http://localhost:5180',
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  // Two servers: the playground for the field itself, and the repo root for the
+  // examples, which load the built `dist/stipple.global.js` by relative path.
+  webServer: [
+    {
+      command: 'pnpm playground -- --port 5180 --strictPort',
+      url: 'http://localhost:5180',
+      reuseExistingServer: true,
+      timeout: 60_000,
+    },
+    {
+      command: 'pnpm examples',
+      url: 'http://localhost:5181/examples/',
+      reuseExistingServer: true,
+      timeout: 60_000,
+    },
+  ],
 });

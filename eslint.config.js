@@ -100,5 +100,15 @@ export default tseslint.config(
     },
   },
 
+  {
+    // The GIF recorder straddles both runtimes: the driver is Node, but the
+    // encoder and every `page.evaluate` body run in the browser. Give the pair
+    // both sets of globals rather than sprinkling directives through them.
+    files: ['scripts/gif-encoder.js', 'scripts/record-gif.mjs'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+
   prettier,
 );
