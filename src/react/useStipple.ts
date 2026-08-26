@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Stipple } from '../stipple';
 import type { ShapeConfig, StippleConfig } from '../core/types';
 import { shapeFromURL } from '../sources/shape';
+import { useStableValue } from './stable';
 
 export interface UseStippleOptions extends StippleConfig {
   shape?: ShapeConfig | string | null;
@@ -20,7 +21,14 @@ export interface UseStippleResult<T extends HTMLElement = HTMLDivElement> {
 export const useStipple = <T extends HTMLElement = HTMLDivElement>(
   options: UseStippleOptions = {},
 ): UseStippleResult<T> => {
-  const { shape = null, morph, paused = false, onInstance, ...config } = options;
+  const { shape: rawShape = null, morph, paused = false, onInstance, ...rawConfig } = options;
+
+  // Both of these are rebuilt on every render — `config` because it is a rest
+  // object, `shape` because callers write it as a literal. The engine compares
+  // several options by reference, so without this an idle parent render would
+  // re-run `precompute`, and an inline shape would be re-sampled outright.
+  const config = useStableValue(rawConfig);
+  const shape = useStableValue(rawShape);
 
   const [node, setNode] = useState<T | null>(null);
   const [instance, setInstance] = useState<Stipple | null>(null);

@@ -33,6 +33,7 @@ This release restructures the public API. Nothing is published yet, so the break
 - `imageFromURL`, `imageFromBlob`, `rasterizeSVG`, `shapeFromImage`, `shapeFromImageURL` and `shapeFromSVGImage`.
 - **`detail` and `detailStrength` on a shape** — `'uniform'` (default), `'edges'` or `'density'`. Uniform sampling over a flat-filled illustration spends ~86% of the budget on featureless interior and reads as a silhouette; edge weighting puts 2.4x more particles on contours for a 3% loss of coverage.
 - `docs/images.md`.
+- **`isSupported()`** — a pre-flight check so an unsupported browser is a branch rather than a `try`/`catch`. It releases its probe context immediately, since browsers cap live contexts at around sixteen and a check that consumed one would be a poor trade for a boolean, and memoises the answer: measured at 15.5 ms for the first call and 0 ms thereafter. Returns `false` without a DOM, so the same branch works either side of hydration. Exported from the root, the lite entry and the script-tag build.
 
 ### Changed
 
@@ -76,6 +77,9 @@ This release restructures the public API. Nothing is published yet, so the break
 - **Sourcemaps are no longer built or published.** They were 932 KB of a 1372 KB package. The published tarball is now 119.9 KB packed and 439 KB unpacked, down from 322.5 KB and 1372 KB.
 - `files` is an explicit allowlist rather than the whole `dist` directory.
 - README size claims corrected: they quoted the whole barrel and were also stale. A real `import { Stipple, shapeFromURL }` is 17.9 KB gzipped; the barrel is 19.6 KB.
+- **`stipple-gl/react` ships a `'use client'` directive**, so `Particles` can be imported straight into a Next.js App Router server component. Without it the build fails at export with `TypeError: (0, ag.useRef) is not a function` — a mangled name and no mention of the real cause. Verified against Next 16.3.3 by building a server component both with and without it. It is prepended after the build rather than set as a tsup banner, because the banner covers a whole config and that one emits seven entries sharing chunks; only the boundary module needs the directive.
+- `scripts/check-dist.mjs` runs after every build and fails if the React entries lose the directive, if another entry gains one, or if the script-tag build stops exposing `isSupported`.
+- `pnpm validate` now ends with `check-dist` and `size`, so a size regression fails the gate instead of being noticed later.
 
 ### Fixed
 
@@ -94,6 +98,11 @@ This release restructures the public API. Nothing is published yet, so the break
 - **`detail: 'edges'` at full strength collapsed flat shapes to a single point.** Edges were detected from luminance alone, which is blind to a flat black icon on transparent — luminance is 0 inside and out. Every weight came out zero and the whole field landed on one pixel. Edges now also read the alpha channel, so a silhouette registers, and a shape with nothing to weight falls back to uniform.
 - Geometry that nothing paints is skipped rather than stamped into the silhouette, and `line`/`polyline` are always stroked since they have no interior.
 - `pnpm install` failed on pnpm 11: `pnpm-workspace.yaml` carried an unfilled placeholder and the pnpm 10 spelling of the build allowlist.
+- **`useStipple` reconfigured the engine on every render.** Its config is a rest object, so it was a fresh reference each time, and the engine compares several options by identity — an inline `color` ramp or `transition` therefore re-ran a per-particle `precompute`, and an inline `shape` re-sampled outright, on every render of the parent. Options and shapes are now compared structurally. Measured in a Next.js app: 187 parent renders in three seconds, down from one `precompute` each to zero. Functions are still compared by identity, since two closures cannot be shown to be equivalent, so a stable reference is still worth giving to `assign`.
+- **A host element with no height rendered nothing and said nothing.** Development builds now warn once, naming the element and its measured size. The check is deferred and cancelled by any successful measurement, because containers sized by a later flex or grid pass are the norm and a warning that cried wolf about them would be worth less than none. Applies to `mode: 'container'` and `'page'`; a `background` field is pinned to the viewport and does not depend on its host.
+- **A cross-origin image failed in two different places and explained neither.** `imageFromURL` goes through `fetch`, which a missing `Access-Control-Allow-Origin` rejects with a bare "Failed to fetch"; an `<img>`, `<canvas>` or `<video>` supplied by the caller instead taints the canvas and raises a `SecurityError` at read-back naming nothing. Both now name the header and the fix, attach the original as `cause`, and pass an `AbortError` from the caller's own signal through untouched.
+- The React bindings had no test coverage of any kind, which is why the re-render defect went unnoticed. `test/support/dom-stub.ts` stands up the smallest browser the real engine will build in, opt-in so the rest of the suite keeps running against untouched globals.
+- `visual/lifecycle.spec.ts` adds three functional browser tests for what no stub can reproduce: twenty mount/destroy cycles against the context cap, forced context loss and recovery, and the OffscreenCanvas worker transfer. Disabling `loseContext()` in `dispose()` produces six "Too many active WebGL contexts" warnings across those cycles, so that line is load-bearing rather than defensive.
 
 ## 0.1.0
 

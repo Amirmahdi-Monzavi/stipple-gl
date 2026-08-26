@@ -120,18 +120,21 @@ Removes every listener, deletes the GL objects, releases the context, and remove
 
 ## Handling unsupported browsers
 
-The constructor throws if WebGL2 is unavailable:
+Check before you build, so the fallback is a branch rather than a `catch`:
 
 ```ts
-let stipple;
-try {
-  stipple = new Stipple('#hero');
-} catch {
+import { isSupported, Stipple } from 'stipple-gl';
+
+if (isSupported()) {
+  new Stipple('#hero');
+} else {
   document.querySelector('#hero').classList.add('static-fallback');
 }
 ```
 
-Or pass `onError` to catch both construction failures and async shape-loading errors.
+`isSupported()` creates a throwaway context, releases it immediately, and caches the answer, so calling it repeatedly is free. It returns `false` during server rendering, which means the same branch works before and after hydration.
+
+The constructor still throws if WebGL2 is unavailable, so `try`/`catch` remains valid, and `onError` catches both construction failures and async shape-loading errors.
 
 ## Troubleshooting
 
@@ -139,7 +142,7 @@ Or pass `onError` to catch both construction failures and async shape-loading er
 
 Work through these in order:
 
-1. **Does the host element have a height?** In `mode: 'container'` the canvas fills its host. A host with `height: auto` and no content collapses to zero, and the engine correctly refuses to allocate. Give it an explicit height and a non-`static` position.
+1. **Does the host element have a height?** In `mode: 'container'` the canvas fills its host. A host with `height: auto` and no content collapses to zero, and the engine correctly refuses to allocate. Give it an explicit height and a non-`static` position. Development builds warn on the console when this happens, naming the element and its measured size; the warning waits a beat first, so a container that gets its height from a later layout pass will not trigger it. The engine starts on its own as soon as the element has a size. This only applies to `mode: 'container'` and `mode: 'page'` — a `background` field is fixed to the viewport and does not depend on its host's height.
 2. **Is something painted over it?** The canvas sits at the start of its host. A sibling with a solid background and a higher stacking order will cover it. The canvas is `pointer-events: none` and `aria-hidden`, so it is meant to sit behind your content, not in front.
 3. **Is the loop running?** Check `stipple.running` and `stipple.fps`. If `running` is `false`, the field is either offscreen (`autoPause`), in a hidden tab, or the user prefers reduced motion.
 4. **Is the colour visible against the background?** A dark particle colour on a dark page is invisible. Try `color: '#ffffff'` to rule it out.

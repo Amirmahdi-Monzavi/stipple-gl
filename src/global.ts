@@ -6,6 +6,7 @@
  * thirty seconds, not that they get the whole API surface.
  */
 export { Stipple, createStipple } from './stipple';
+export { isSupported } from './core/supported';
 export { defaultOptions, resolveOptions, mergeOptions, responsiveCount } from './core/options';
 export { shapeFromSVG, shapeFromString, shapeFromURL, fitShapeToElement } from './sources/shape';
 export { parseSVG, loadSVG } from './sources/svg';

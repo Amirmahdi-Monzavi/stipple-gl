@@ -1,5 +1,6 @@
 export { Stipple, createStipple } from './stipple';
 export { StippleCore } from './core/engine';
+export { isSupported } from './core/supported';
 export type { StippleTarget } from './core/engine';
 
 export { defaultOptions, resolveOptions, mergeOptions, responsiveCount } from './core/options';

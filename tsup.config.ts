@@ -1,4 +1,28 @@
+import { readFile, writeFile } from 'node:fs/promises';
+
 import { defineConfig } from 'tsup';
+
+/**
+ * Mark the React entry as a client module.
+ *
+ * Without the directive, importing `Particles` from a Next.js App Router server
+ * component fails on the hooks, and the caller has to wrap it themselves. Every
+ * client-only React package ships this.
+ *
+ * It is prepended after the build rather than set as a `banner`, because the
+ * banner applies to a whole tsup config and this one emits seven entries that
+ * share chunks — stamping `index`, `worker` and `thread` as client modules
+ * would be wrong, and splitting React into its own config to avoid that would
+ * cost it a private copy of the core. The directive only has to sit on the
+ * boundary module: whatever it imports joins the client graph on its own.
+ */
+const markReactAsClient = async (): Promise<void> => {
+  for (const file of ['dist/react.js', 'dist/react.cjs']) {
+    const source = await readFile(file, 'utf8');
+    if (/^\s*(['"])use client\1/.test(source)) continue;
+    await writeFile(file, "'use client';\n" + source);
+  }
+};
 
 const entry = {
   index: 'src/index.ts',
@@ -27,6 +51,7 @@ export default defineConfig([
     outExtension({ format }) {
       return { js: format === 'cjs' ? '.cjs' : '.js' };
     },
+    onSuccess: markReactAsClient,
   },
   {
     // The script-tag build. Self-contained, minified, and with the dev-only

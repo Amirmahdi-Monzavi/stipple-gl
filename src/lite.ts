@@ -20,6 +20,7 @@ export { createMorphBehavior } from './behaviors/morph';
 export { createIntegrateBehavior } from './behaviors/integrate';
 export { createDriftBehavior } from './behaviors/drift';
 
+export { isSupported } from './core/supported';
 export { defaultOptions, resolveOptions, mergeOptions, responsiveCount } from './core/options';
 export { clamp, clamp01, lerp, rand, noise2, hash2i, parseColor } from './core/math';
 

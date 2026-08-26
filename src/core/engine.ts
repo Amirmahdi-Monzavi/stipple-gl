@@ -80,6 +80,8 @@ export class StippleCore implements StippleInstance {
   private disposed = false;
   private pageHeight: number | null = null;
 
+  private sizeWarning: ReturnType<typeof setTimeout> | null = null;
+
   private resizeObserver: ResizeObserver | null = null;
   private intersectionObserver: IntersectionObserver | null = null;
   private motionQuery: MediaQueryList | null = null;
@@ -127,6 +129,50 @@ export class StippleCore implements StippleInstance {
 
     if (this.motionAllowed) this.syncRunning();
     else this.runtime.renderStatic(performance.now());
+
+    this.watchForZeroSize();
+  }
+
+  /**
+   * A host with no height renders nothing and says nothing, which is the most
+   * common way this library gets written off in five minutes — and it is almost
+   * always the page's CSS rather than the engine.
+   *
+   * The check is deferred by a macrotask, and any successful measurement in the
+   * meantime cancels it. Containers that get their size from a flex or grid pass
+   * a beat after mount are the norm, not the exception, and a warning that cries
+   * wolf about them would be worth less than no warning at all. By the time this
+   * runs, the ResizeObserver bound above has already reported the real size if
+   * there is one.
+   */
+  private watchForZeroSize(): void {
+    if (process.env.NODE_ENV === 'production') return;
+    if (!this.runtime.degenerate) return;
+
+    this.sizeWarning = setTimeout(() => {
+      this.sizeWarning = null;
+      if (this.disposed || !this.runtime.degenerate) return;
+
+      const rect = this.canvas.getBoundingClientRect();
+      const tag = this.host.tagName.toLowerCase();
+      const id = this.host.id ? '#' + this.host.id : '';
+      const cls = this.host.classList.length ? '.' + [...this.host.classList].join('.') : '';
+
+      console.warn(
+        'stipple-gl: the host element <' +
+          tag +
+          id +
+          cls +
+          '> measures ' +
+          Math.round(rect.width) +
+          '×' +
+          Math.round(rect.height) +
+          ', so nothing will be drawn. Give it a height in CSS — a percentage ' +
+          'height needs a sized parent, and a flex or grid child may need ' +
+          'min-height: 0. The engine will start on its own once the element ' +
+          'has a size.',
+      );
+    }, 0);
   }
 
   get options(): StippleOptions {
@@ -445,6 +491,11 @@ export class StippleCore implements StippleInstance {
   destroy(): void {
     if (this.disposed) return;
     this.disposed = true;
+
+    if (this.sizeWarning !== null) {
+      clearTimeout(this.sizeWarning);
+      this.sizeWarning = null;
+    }
     this.stop();
     this.unbind();
     this.events.dispose();

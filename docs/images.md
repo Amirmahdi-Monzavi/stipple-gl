@@ -90,7 +90,14 @@ shapeFromImage(document.querySelector('video')); // a live frame
 shapeFromImage(myCanvas);
 ```
 
-`imageFromURL` fetches and decodes, and accepts an `AbortSignal`. Cross-origin sources need permissive CORS headers, because the sampler reads pixels back and a tainted canvas cannot be read.
+`imageFromURL` fetches and decodes, and accepts an `AbortSignal`.
+
+Cross-origin sources need permissive CORS headers, because the sampler reads pixels back and a tainted canvas cannot be read. The two loading routes fail in different places, so the messages differ:
+
+- `shapeFromImageURL` and `imageFromURL` go through `fetch`, which a missing `Access-Control-Allow-Origin` rejects outright. The thrown error names the URL and the header. An `AbortError` from your own signal passes through untouched.
+- Passing an `<img>`, `<canvas>` or `<video>` you loaded yourself defers the failure to read-back time, where the browser raises a `SecurityError` naming nothing. The sampler catches it and explains the fix — set `crossOrigin="anonymous"` on the element _before_ it starts loading, or load through `shapeFromImageURL` instead.
+
+Same-origin images need none of this.
 
 ---
 

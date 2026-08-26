@@ -11,7 +11,10 @@ export interface ImageShapeOverrides {
   threshold?: number;
 }
 
-const fail = (message: string): Error => new Error('stipple-gl: ' + message);
+const fail = (message: string, cause?: unknown): Error =>
+  cause === undefined
+    ? new Error('stipple-gl: ' + message)
+    : new Error('stipple-gl: ' + message, { cause });
 
 /**
  * Decode any image the browser understands into an ImageBitmap.
@@ -22,7 +25,29 @@ const fail = (message: string): Error => new Error('stipple-gl: ' + message);
  */
 export const imageFromURL = async (url: string, signal?: AbortSignal): Promise<ImageBitmap> => {
   const init = signal ? { signal } : undefined;
-  const response = await fetch(url, init);
+
+  let response: Response;
+  try {
+    response = await fetch(url, init);
+  } catch (error) {
+    // An aborted load is the caller's own doing and should surface untouched.
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+
+    // Everything else here is a network failure or, far more often, a
+    // cross-origin block — which rejects with a bare "Failed to fetch" that
+    // says nothing about why.
+    throw fail(
+      'could not fetch ' +
+        url +
+        '. If it is on another origin, the server has to send ' +
+        'Access-Control-Allow-Origin; browsers block the read otherwise. ' +
+        '(' +
+        (error instanceof Error ? error.message : String(error)) +
+        ')',
+      error,
+    );
+  }
+
   if (!response.ok) {
     throw fail('failed to load ' + url + ' (' + response.status + ')');
   }

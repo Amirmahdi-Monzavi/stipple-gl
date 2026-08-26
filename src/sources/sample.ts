@@ -322,7 +322,26 @@ export const sampleShape = (
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  const pixels = ctx.getImageData(0, 0, rw, rh).data;
+  // Reading back a canvas that has had a cross-origin image drawn onto it
+  // throws a SecurityError naming nothing useful. Sampling is the only thing
+  // this library does with an image, so the failure is total and the caller
+  // needs to know it is a CORS problem rather than a bad image.
+  let pixels: Uint8ClampedArray;
+  try {
+    pixels = ctx.getImageData(0, 0, rw, rh).data;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'SecurityError') {
+      throw new Error(
+        'stipple-gl: cannot read the pixels of this image because it tainted ' +
+          'the canvas. It was loaded from another origin without CORS. Set ' +
+          'crossOrigin="anonymous" on the <img> before it loads and make sure ' +
+          'the server sends Access-Control-Allow-Origin, or load it through ' +
+          'shapeFromImageURL, which fetches it instead.',
+        { cause: error },
+      );
+    }
+    throw error;
+  }
   const total = rw * rh;
 
   if (hits.length < total) hits = new Uint32Array(total);

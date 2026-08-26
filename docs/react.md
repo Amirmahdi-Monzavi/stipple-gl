@@ -134,11 +134,22 @@ See [scroll.md](scroll.md) for the underlying behaviour.
 
 The engine is created once per host element and per `mode`. Changing `mode` recreates it; changing anything else applies through `setOptions` without a rebuild.
 
-Option props are diffed by object identity, so an inline object like `major={{ size: 8 }}` re-applies on every render. That is a cheap merge rather than a rebuild, but memoising it is tidier:
+Option and shape props are compared structurally rather than by identity, so writing them inline is fine — a re-render that changes no values reaches the engine as nothing at all:
 
 ```tsx
-const major = useMemo(() => ({ size: 8 }), []);
-<Particles major={major} />;
+// Rebuilt on every render, but only applied when a value actually differs.
+<Particles major={{ size: 8 }} shape={{ paths }} />
+```
+
+Functions are the exception. Two closures cannot be shown to be equivalent, so an inline callback always counts as new. That is harmless for `onReady` and `onError`, which are only stored — but `assign` re-samples the shape whenever it changes, so give it a stable reference:
+
+```tsx
+// Outside the component, or wrapped in useCallback with an empty dependency list.
+const byIndex: AssignFn = (points, count, spreadX, spreadY, outX, outY, outZ, depth) => {
+  /* ... */
+};
+
+<Particles assign={byIndex} />;
 ```
 
 `count` and `minorCount` are handled separately and only reallocate when the number actually changes.
@@ -150,3 +161,16 @@ The binding handles React 18+ StrictMode's double mount correctly — the engine
 ## Server rendering
 
 The engine requires `window` and throws if constructed on the server. The component only creates it inside an effect, so it is safe in Next.js, Remix, and React Router without a dynamic import. Nothing renders until hydration.
+
+`stipple-gl/react` ships a `'use client'` directive, so in the Next.js App Router you can import it straight into a server component and it becomes a client boundary on its own:
+
+```tsx
+// app/page.tsx — no 'use client' needed here, and no dynamic import
+import { Particles } from 'stipple-gl/react';
+
+export default function Page() {
+  return <Particles count={3500} />;
+}
+```
+
+Only the React entry carries the directive. Importing `stipple-gl` itself from a server component is still a mistake — it constructs nothing on import, but there is no reason to send it there.
