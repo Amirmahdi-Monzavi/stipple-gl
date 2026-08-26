@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -25,39 +21,26 @@
     "declarationMap": true,
     "sourceMap": true,
     "noEmit": true,
-    "types": [
-      "vitest/globals",
-      "node"
-    ],
+    "types": ["vitest/globals", "node"],
     "baseUrl": ".",
     "paths": {
-      "stipple-gl": [
-        "./src/index.ts"
-      ],
-      "stipple-gl/react": [
-        "./src/react/index.ts"
-      ],
-      "stipple-gl/scroll": [
-        "./src/scroll/index.ts"
-      ],
-      "stipple-gl/presets": [
-        "./src/presets/index.ts"
-      ],
-      "stipple-gl/worker": [
-        "./src/worker/index.ts"
-      ],
-      "stipple-gl/lite": [
-        "./src/lite.ts"
-      ]
+      "stipple-gl": ["./src/index.ts"],
+      "stipple-gl/react": ["./src/react/index.ts"],
+      "stipple-gl/scroll": ["./src/scroll/index.ts"],
+      "stipple-gl/presets": ["./src/presets/index.ts"],
+      "stipple-gl/worker": ["./src/worker/index.ts"],
+      "stipple-gl/lite": ["./src/lite.ts"]
     }
   },
   "include": [
     "src",
     "test",
-    "playground/src"
+    "visual",
+    "playground/src",
+    "scripts",
+    "*.config.ts",
+    "eslint.config.js",
+    "examples"
   ],
-  "exclude": [
-    "dist",
-    "node_modules"
-  ]
+  "exclude": ["dist", "node_modules"]
 }

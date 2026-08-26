@@ -12,21 +12,21 @@ React is an optional peer dependency. The core has no dependencies at all — th
 import { Particles } from 'stipple-gl/react';
 
 export function Hero() {
-  return <Particles mode="background" count={4000} color="#4f9c7d" shape="/shield.svg" morph={1} />;
+  return <Particles mode="background" count={4000} color="#5ec8f2" shape="/shield.svg" morph={1} />;
 }
 ```
 
 The component renders a host `<div>` and manages the canvas, the engine, and teardown inside it. It accepts every core option as a prop, plus:
 
-| prop | type | description |
-|---|---|---|
-| `shape` | `ShapeConfig \| string \| null` | A shape object, a URL to fetch, or `null` to disperse. |
-| `morph` | `number` | Target morph, 0 to 1. |
-| `paused` | `boolean` | Stops the loop without tearing anything down. |
-| `onInstance` | `(instance) => void` | Receives the engine on mount and `null` on unmount. |
-| `className` | `string` | Applied to the host element. |
-| `style` | `CSSProperties` | Merged over the mode's default positioning. |
-| `children` | `ReactNode` | Rendered inside the host, above the canvas. |
+| prop         | type                            | description                                            |
+| ------------ | ------------------------------- | ------------------------------------------------------ |
+| `shape`      | `ShapeConfig \| string \| null` | A shape object, a URL to fetch, or `null` to disperse. |
+| `morph`      | `number`                        | Target morph, 0 to 1.                                  |
+| `paused`     | `boolean`                       | Stops the loop without tearing anything down.          |
+| `onInstance` | `(instance) => void`            | Receives the engine on mount and `null` on unmount.    |
+| `className`  | `string`                        | Applied to the host element.                           |
+| `style`      | `CSSProperties`                 | Merged over the mode's default positioning.            |
+| `children`   | `ReactNode`                     | Rendered inside the host, above the canvas.            |
 
 Passing a string to `shape` fetches and parses the SVG, with the request cached across instances and cancelled if the prop changes mid-flight.
 
@@ -42,11 +42,10 @@ function ConsentHero() {
         mode="background"
         shape={accepted ? '/check.svg' : '/shield.svg'}
         morph={1}
-        color={accepted ? '#4f9c7d' : '#63748c'}
+        color={accepted ? '#5ec8f2' : '#63748c'}
       />
       <label>
-        <input type="checkbox" onChange={(e) => setAccepted(e.target.checked)} />
-        I agree
+        <input type="checkbox" onChange={(e) => setAccepted(e.target.checked)} />I agree
       </label>
     </>
   );

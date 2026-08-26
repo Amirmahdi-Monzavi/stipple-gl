@@ -88,10 +88,10 @@ const createEmissionState = (capacity: number): EmissionState => ({
 
 /** Blend two packed 0x00RRGGBB values. Channels are independent, so mix in place. */
 const mixPacked = (from: number, to: number, t: number): number => {
-  const r = (from & 0xff) + (((to & 0xff) - (from & 0xff)) * t);
-  const g = ((from >> 8) & 0xff) + ((((to >> 8) & 0xff) - ((from >> 8) & 0xff)) * t);
-  const b = ((from >> 16) & 0xff) + ((((to >> 16) & 0xff) - ((from >> 16) & 0xff)) * t);
-  return (r | 0) | ((g | 0) << 8) | ((b | 0) << 16);
+  const r = (from & 0xff) + ((to & 0xff) - (from & 0xff)) * t;
+  const g = ((from >> 8) & 0xff) + (((to >> 8) & 0xff) - ((from >> 8) & 0xff)) * t;
+  const b = ((from >> 16) & 0xff) + (((to >> 16) & 0xff) - ((from >> 16) & 0xff)) * t;
+  return r | 0 | ((g | 0) << 8) | ((b | 0) << 16);
 };
 
 /** A ramp or shape spec collapsed to one colour, for the ambient field. */
@@ -101,7 +101,11 @@ const resolveSolid = (spec: Exclude<ColorSpec, string>, fallback: RGB): string =
 const packRgbString = (rgb: RGB): string =>
   '#' +
   [rgb[0], rgb[1], rgb[2]]
-    .map((c) => Math.max(0, Math.min(255, Math.round(c))).toString(16).padStart(2, '0'))
+    .map((c) =>
+      Math.max(0, Math.min(255, Math.round(c)))
+        .toString(16)
+        .padStart(2, '0'),
+    )
     .join('');
 
 const colorCache = new Map<string, RGB>();
@@ -186,9 +190,8 @@ export class CpuBackend implements SimulationBackend {
     const radius = this.radiusPx || 1;
     const count = major.count;
 
-    const ramp = typeof options.color === 'object' && options.color.type === 'ramp'
-      ? options.color.by
-      : null;
+    const ramp =
+      typeof options.color === 'object' && options.color.type === 'ramp' ? options.color.by : null;
 
     for (let i = 0; i < count; i++) {
       major.sizeRoll[i] = Math.pow(hash2i(i, 4093), majorBias);
@@ -226,8 +229,7 @@ export class CpuBackend implements SimulationBackend {
     const count = major.count;
     if (count === 0) return;
 
-    const radius =
-      Math.hypot(viewport.width, viewport.height) * 0.5 * this.spreadRadius;
+    const radius = Math.hypot(viewport.width, viewport.height) * 0.5 * this.spreadRadius;
     this.radiusPx = radius;
 
     const centerX = viewport.width / 2;
@@ -304,8 +306,10 @@ export class CpuBackend implements SimulationBackend {
       return;
     }
 
-    const assign = options.shapes?.assign;
-    if (!assign) return;
+    // Called through the object, not extracted: a class-based ShapeSupport would
+    // lose its bound receiver if the method were pulled off the object first.
+    const shapes = options.shapes;
+    if (!shapes) return;
 
     const count = major.count;
 
@@ -322,7 +326,7 @@ export class CpuBackend implements SimulationBackend {
 
     if (this.sourceOrder.length < count) this.sourceOrder = new Uint32Array(count);
 
-    assign(
+    shapes.assign(
       options.assign,
       points,
       count,

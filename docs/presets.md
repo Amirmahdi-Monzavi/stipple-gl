@@ -17,11 +17,11 @@ These carry major particles (`count > 0`) and the full behaviour pipeline. They 
 
 ### `morph`
 
-The reference configuration, and what the README screenshots use. 3,500 major particles at size 5, angular target assignment, a left-to-right sweep, and mid-strength flight turbulence. Emission and pointer interaction are both on. If you want "the thing this library does", start here and change the colour.
+The reference configuration, and what the README screenshots use. 3,500 major particles at size 5, angular target assignment, the default `condense` choreography, and mid-strength flight turbulence. Emission and pointer interaction are both on. If you want "the thing this library does", start here and change the colour.
 
 ### `snap`
 
-`morph` with the patience removed. Its `enter` choreography runs at roughly double the speed (`0.03` against `0.014`) with `easeOutExpo` rather than `easeInOutCubic`, so particles arrive fast and stop hard instead of gliding in. The wavefront is radial rather than horizontal, so the shape condenses from the centre, and its `swap` is faster still. Slightly fewer, slightly larger particles, and a stiffer jelly. Good for a logo that should land on scroll rather than unfold.
+`morph` with the patience removed. Its `enter` choreography runs faster still than the default and holds a stiffer jelly, so particles arrive hard and stop dead rather than gliding in. Slightly fewer, slightly larger particles, and a stiffer jelly. Good for a logo that should land on scroll rather than unfold.
 
 ## Ambient presets
 
@@ -39,7 +39,7 @@ If you switch to one of these and then set a shape, `setShape` returns `false` a
 
 ### `constellation`
 
-The odd one out: it keeps 1,200 major particles and the full pipeline, so it *can* morph, but it is tuned as a background — small particles, gentle breathing, no pointer, no emission. Use it when you want an ambient field that can still occasionally form a shape.
+The odd one out: it keeps 1,200 major particles and the full pipeline, so it _can_ morph, but it is tuned as a background — small particles, gentle breathing, no pointer, no emission. Use it when you want an ambient field that can still occasionally form a shape.
 
 ### `nebula`
 

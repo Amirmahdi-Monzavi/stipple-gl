@@ -129,7 +129,7 @@ export const createScrollMorph = (
     }
 
     const morph = clamp01(1 - bestNormalized / fadeRange);
-    instance.setMorph(activeKey === 'none' ? 0 : morph);
+    void instance.setMorph(activeKey === 'none' ? 0 : morph);
   };
 
   const schedule = (): void => {

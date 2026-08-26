@@ -54,11 +54,7 @@ export class Runtime {
   private fpsValue = 0;
   private callbacks: RuntimeCallbacks;
 
-  constructor(
-    surface: RuntimeSurface,
-    options: StippleOptions,
-    callbacks: RuntimeCallbacks = {},
-  ) {
+  constructor(surface: RuntimeSurface, options: StippleOptions, callbacks: RuntimeCallbacks = {}) {
     this.opts = options;
     this.callbacks = callbacks;
 
@@ -69,7 +65,7 @@ export class Runtime {
       depth: false,
       stencil: false,
       powerPreference: 'high-performance',
-    }) as WebGL2RenderingContext | null;
+    });
 
     if (!gl) throw fail('WebGL2 is not supported in this environment');
 
@@ -153,7 +149,9 @@ export class Runtime {
     const shapes = this.opts.shapes;
     if (!shapes) {
       this.opts.onError?.(
-        fail('setShape needs the SVG sampler; import Stipple from "stipple-gl", not "stipple-gl/lite"'),
+        fail(
+          'setShape needs the SVG sampler; import Stipple from "stipple-gl", not "stipple-gl/lite"',
+        ),
       );
       return;
     }
@@ -209,10 +207,7 @@ export class Runtime {
     // A swap only makes sense when a shape is already on screen and the field is
     // actually showing it. Otherwise this is a plain enter and the sphere is the
     // starting point.
-    const resolved =
-      choreography === undefined
-        ? this.opts.transition.swap
-        : choreography;
+    const resolved = choreography === undefined ? this.opts.transition.swap : choreography;
     const wantsSwap = resolved !== 'none';
     const swapping = wantsSwap && had && this.state.morph > 0.02;
 
@@ -374,7 +369,10 @@ export class Runtime {
       } else {
         const swapSpeed = clamp01(1 - Math.pow(1 - swapChoreo.speed, state.dtScale));
         state.swap += (1 - state.swap) * swapSpeed;
-        if (state.swap > 0.9995) {
+        // The last fraction of a swap is a sub-pixel move between two shapes,
+        // and  smooths the handover, so finishing early costs nothing
+        // visible and keeps a swap as quick as an enter.
+        if (state.swap > 0.995) {
           state.swap = 1;
           state.swapping = false;
           this.swapChoreography = null;

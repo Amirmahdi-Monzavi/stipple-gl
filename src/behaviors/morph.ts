@@ -133,7 +133,8 @@ export const createMorphBehavior = (): Behavior => ({
       // 3. Flash belongs to whichever wavefront is actually crossing.
       if (swapFlashing) {
         const distance = Math.abs(swapProgress - launchOf(delay, swapStagger));
-        major.flash[i] = distance < swapFlashWidth ? (1 - distance / swapFlashWidth) * swapFlash : 0;
+        major.flash[i] =
+          distance < swapFlashWidth ? (1 - distance / swapFlashWidth) * swapFlash : 0;
       } else if (flashing) {
         const distance = Math.abs(morph - launch);
         major.flash[i] = distance < flashWidth ? (1 - distance / flashWidth) * flash : 0;

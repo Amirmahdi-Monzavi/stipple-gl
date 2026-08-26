@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CpuBackend } from '../src/backends/cpu';
-import { defaultOptions, resolveOptions } from '../src/core/options';
+import { resolveOptions } from '../src/core/options';
 import { resolveChoreography } from '../src/core/choreography';
 import type { StaggerOrder, Viewport } from '../src/core/types';
 
@@ -64,8 +64,10 @@ describe('sweep ordering', () => {
   });
 });
 
-describe('sweep defaults read as a wipe, not a flash', () => {
-  const { stagger, flash } = resolveChoreography(defaultOptions.transition.enter);
+// The default is now 'condense', a centre-out move. 'sweep' is still the
+// directional wipe, so that is what these assert.
+describe('the sweep choreography reads as a wipe, not a flash', () => {
+  const { stagger, flash } = resolveChoreography('sweep');
 
   it('ships with the wavefront flash off', () => {
     expect(flash).toBe(0);
@@ -82,7 +84,7 @@ describe('sweep defaults read as a wipe, not a flash', () => {
   // concurrency peaks there. Measured peak is ~32% of the field at morph 0.5,
   // against 100% for an unstaggered transition.
   it('keeps only a narrow band of the field in flight at any instant', () => {
-    const major = layoutWith(resolveChoreography(defaultOptions.transition.enter).order);
+    const major = layoutWith(resolveChoreography('sweep').order);
     const span = 1 - stagger;
 
     const share = (morph: number): number => {

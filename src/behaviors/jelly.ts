@@ -1,4 +1,4 @@
-import { noise2 } from '../core/math';
+import { fastCos, fastSin, noise2 } from '../core/math';
 import type { Behavior, SimContext } from '../core/types';
 
 export const createJellyBehavior = (): Behavior => ({
@@ -22,12 +22,9 @@ export const createJellyBehavior = (): Behavior => ({
     for (let i = 0; i < count; i++) {
       const depth = major.spreadZ[i]! * depthRange + 1;
       const flicker = noise2(i * 0.04, time * 0.55) - 0.5;
-      const waveA = (Math.sin(time * speed + i * 0.08) * 0.7 + flicker * 1.1) * intensity * depth;
+      const waveA = (fastSin(time * speed + i * 0.08) * 0.7 + flicker * 1.1) * intensity * depth;
       const waveB =
-        (Math.cos(time * speed * 0.65 + i * 0.11) * 0.7 + flicker * 0.9) *
-        intensity *
-        0.45 *
-        depth;
+        (fastCos(time * speed * 0.65 + i * 0.11) * 0.7 + flicker * 0.9) * intensity * 0.45 * depth;
       major.tx[i] = major.tx[i]! + waveA * weight;
       major.ty[i] = major.ty[i]! + waveB * weight;
     }

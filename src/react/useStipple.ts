@@ -59,7 +59,6 @@ export const useStipple = <T extends HTMLElement = HTMLDivElement>(
   useEffect(() => {
     if (!instance) return;
     instance.setOptions(config);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [instance, config]);
 
   useEffect(() => {
@@ -96,7 +95,7 @@ export const useStipple = <T extends HTMLElement = HTMLDivElement>(
 
   useEffect(() => {
     if (!instance || morph === undefined) return;
-    instance.setMorph(morph);
+    void instance.setMorph(morph);
   }, [instance, morph]);
 
   useEffect(() => {

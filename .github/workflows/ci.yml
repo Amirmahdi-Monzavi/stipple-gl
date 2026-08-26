@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, master]
   pull_request:
 
 jobs:
@@ -22,6 +22,12 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format:check
+
       - name: Typecheck
         run: pnpm typecheck
 
@@ -36,3 +42,35 @@ jobs:
 
       - name: Bundle size
         run: node scripts/measure.mjs
+
+  visual:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # Playwright's own Chromium, pinned to the installed @playwright/test.
+      # Screenshot comparison is only meaningful against a fixed browser build.
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Visual regression
+        run: pnpm visual
+
+      # The diff images are the whole point when this fails.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: visual-diff
+          path: visual/.results/
+          retention-days: 7

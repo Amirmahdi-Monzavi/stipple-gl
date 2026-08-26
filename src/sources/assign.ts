@@ -93,10 +93,7 @@ export const assignTargets = (
   for (let i = 0; i < count; i++) {
     const source = i % available;
     shapeOrder[i] = source;
-    shapeAngles[i] = Math.atan2(
-      points[source * 2 + 1]! - shapeCy,
-      points[source * 2]! - shapeCx,
-    );
+    shapeAngles[i] = Math.atan2(points[source * 2 + 1]! - shapeCy, points[source * 2]! - shapeCx);
   }
 
   let particleCx = 0;

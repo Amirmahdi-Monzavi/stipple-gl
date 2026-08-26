@@ -1,5 +1,5 @@
 import { createMinimalBehaviors } from '../behaviors';
-import { easeInOutCubic, easeOutExpo } from '../core/math';
+import { easeOutExpo } from '../core/math';
 import type { StippleConfig } from '../core/types';
 
 export const morph: StippleConfig = {
@@ -8,9 +8,9 @@ export const morph: StippleConfig = {
   major: { size: 5, follow: 0.1, followSpread: 0.016 },
   assign: 'angular',
   transition: {
-    enter: { speed: 0.014, easing: easeInOutCubic, stagger: 0.82, order: 'x', turbulence: 16 },
+    enter: 'condense',
     exit: 'mirror',
-    swap: { speed: 0.02, easing: easeInOutCubic, stagger: 0.7, order: 'x', turbulence: 10 },
+    swap: 'condense',
   },
   jelly: { intensity: 2.4, speed: 1.35 },
   emission: { enabled: true },

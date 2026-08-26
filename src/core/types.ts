@@ -36,14 +36,18 @@ export interface SVGShapeData {
  * the postMessage boundary — the DOM element types do not exist there.
  */
 export type ImageSource =
-  | ImageBitmap
-  | HTMLImageElement
-  | HTMLCanvasElement
-  | OffscreenCanvas
-  | HTMLVideoElement;
+  ImageBitmap | HTMLImageElement | HTMLCanvasElement | OffscreenCanvas | HTMLVideoElement;
 
-/** Which pixels of a raster source count as ink. */
-export type ImageMask = 'alpha' | 'dark' | 'light';
+/**
+ * Which pixels of a raster source count as ink.
+ *
+ * `auto` inspects the image: transparency means the alpha channel is the mask,
+ * and an opaque image falls back to luminance, keeping whichever of dark or
+ * light is the minority — ink is what there is less of. Alpha masking an opaque
+ * image is never what anyone wants, because every pixel qualifies and the
+ * "shape" comes out as the source rectangle.
+ */
+export type ImageMask = 'auto' | 'alpha' | 'dark' | 'light';
 
 /**
  * How the particle budget is spread across the ink.
@@ -63,7 +67,7 @@ export interface ShapeConfig {
    * and filters survive. Takes precedence over `paths` when both are present.
    */
   image?: ImageSource;
-  /** How ink is decided for `image`. Defaults to `'alpha'`. */
+  /** How ink is decided for `image`. Defaults to `'auto'`. */
   mask?: ImageMask;
   /** Cutoff for `mask`, 0..1. Defaults to 0.03 for alpha, 0.5 otherwise. */
   threshold?: number;
@@ -154,7 +158,7 @@ export interface Choreography {
 }
 
 /** Ready-made choreographies. Expand to a full {@link Choreography} at resolve time. */
-export type ChoreographyName = 'uniform' | 'sweep' | 'burst';
+export type ChoreographyName = 'condense' | 'uniform' | 'sweep' | 'burst';
 
 export type ChoreographyConfig = ChoreographyName | DeepPartial<Choreography>;
 
@@ -314,12 +318,7 @@ export type DeepPartial<T> = {
 export type Easing = (t: number) => number;
 
 export type EasingName =
-  | 'linear'
-  | 'inOutCubic'
-  | 'inOutQuad'
-  | 'outExpo'
-  | 'outBack'
-  | 'inOutElastic';
+  'linear' | 'inOutCubic' | 'inOutQuad' | 'outExpo' | 'outBack' | 'inOutElastic';
 
 export interface Viewport {
   width: number;

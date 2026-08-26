@@ -1,20 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { Runtime } from '../src/core/runtime';
-import { defaultOptions, resolveOptions } from '../src/core/options';
-import { resolveChoreography, mirrorChoreography, baseChoreography } from '../src/core/choreography';
+import { defaultOptions, mergeOptions, resolveOptions } from '../src/core/options';
+import {
+  resolveChoreography,
+  mirrorChoreography,
+  baseChoreography,
+} from '../src/core/choreography';
 import { behaviorOrder, sortBehaviors, PHASE_ORDER } from '../src/core/pipeline';
 import { validateConfig } from '../src/core/validate';
 import { createDefaultBehaviors } from '../src/behaviors';
 import { assignTargets } from '../src/sources/assign';
 import { shapeBounds } from '../src/sources/sample';
-import type {
-  AssignFn,
-  Behavior,
-  MajorState,
-  ShapeConfig,
-  ShapeSupport,
-} from '../src/core/types';
+import type { AssignFn, Behavior, MajorState, ShapeConfig, ShapeSupport } from '../src/core/types';
 
 const stubGl = new Proxy(
   {},
@@ -38,7 +36,9 @@ const ringSampler = (radius: number, colors: number[] | null = null): ShapeSuppo
     }
     return {
       points,
-      colors: colors ? Uint32Array.from({ length: count }, (_, i) => colors[i % colors.length]!) : null,
+      colors: colors
+        ? Uint32Array.from({ length: count }, (_, i) => colors[i % colors.length]!)
+        : null,
     };
   },
   bounds: shapeBounds,
@@ -50,7 +50,12 @@ const shape = (name: string): ShapeConfig => ({ paths: [{ d: 'M0 0', fill: name 
 const boot = (radius = 200, support = ringSampler(radius)) => {
   const runtime = new Runtime(
     stubSurface,
-    resolveOptions({ count: 800, minorCount: 0, shapes: support, behaviors: createDefaultBehaviors() }),
+    resolveOptions({
+      count: 800,
+      minorCount: 0,
+      shapes: support,
+      behaviors: createDefaultBehaviors(),
+    }),
   );
   runtime.setResolution(1280, 720, 1);
   return runtime;
@@ -124,7 +129,9 @@ describe('shape-to-shape swap', () => {
     runtime.setShape(shape('second'));
 
     // The outgoing shape must be preserved to interpolate from.
-    expect(Array.from(major.prevShapeX.subarray(0, 8))).toEqual(Array.from(firstTargets.subarray(0, 8)));
+    expect(Array.from(major.prevShapeX.subarray(0, 8))).toEqual(
+      Array.from(firstTargets.subarray(0, 8)),
+    );
     expect(runtime.state.swapping).toBe(true);
     expect(runtime.state.swap).toBe(0);
 
@@ -297,7 +304,7 @@ describe('resetOptions', () => {
 
     expect(runtime.opts.opacity).toBe(defaultOptions.opacity);
     expect(runtime.opts.major.size).toBe(defaultOptions.major.size);
-    expect(runtime.state.choreo.enter.stagger).toBe(resolveChoreography('sweep').stagger);
+    expect(runtime.state.choreo.enter.stagger).toBe(resolveChoreography('condense').stagger);
     expect(runtime.opts.shapes).toBe(support);
     expect(runtime.opts.behaviors).toBe(behaviors);
   });
@@ -423,5 +430,38 @@ describe('custom assign function', () => {
     for (let i = 1; i < major.count; i++) {
       expect(major.shapeX[i]).toBe(major.shapeX[0]);
     }
+  });
+});
+
+// ---------------------------------------------------------------- tagged unions
+
+describe('merging a tagged union', () => {
+  it('replaces a colour variant rather than merging its keys', () => {
+    const ramp = { type: 'ramp' as const, from: '#000', to: '#fff', by: 'radius' as const };
+    const merged = mergeOptions({ color: ramp }, { color: { type: 'shape', fallback: '#123' } });
+    expect(merged.color).toEqual({ type: 'shape', fallback: '#123' });
+    expect('from' in merged.color).toBe(false);
+  });
+
+  it('still merges two members of the same variant', () => {
+    const ramp = { type: 'ramp' as const, from: '#000', to: '#fff', by: 'radius' as const };
+    const merged = mergeOptions({ color: ramp }, { color: { type: 'ramp', to: '#f0f' } });
+    expect(merged.color).toEqual({ type: 'ramp', from: '#000', to: '#f0f', by: 'radius' });
+  });
+
+  it('replaces a string colour with an object and back', () => {
+    const toObject = mergeOptions(
+      { color: '#abc' },
+      { color: { type: 'shape', fallback: '#123' } },
+    );
+    expect(toObject.color).toEqual({ type: 'shape', fallback: '#123' });
+
+    const toString = mergeOptions(toObject, { color: '#def' });
+    expect(toString.color).toBe('#def');
+  });
+
+  it('leaves ordinary nested option groups merging as before', () => {
+    const merged = mergeOptions({ major: { size: 6, twinkle: 0.2 } }, { major: { size: 9 } });
+    expect(merged.major).toEqual({ size: 9, twinkle: 0.2 });
   });
 });

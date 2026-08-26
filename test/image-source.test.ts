@@ -69,7 +69,7 @@ beforeAll(() => {
       this.width = w;
       this.height = h;
       painted = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) };
-      return canvas as never;
+      return canvas;
     }
   };
   // The sampler caches its raster, so prime it at the size the tests use.

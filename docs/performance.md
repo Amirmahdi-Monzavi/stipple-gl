@@ -112,15 +112,15 @@ Mobile browsers resize the viewport when the URL bar hides. For `mode: 'page'`, 
 
 Simulation step plus vertex packing and buffer upload, at a 1280×720 canvas with the full default behaviour pipeline and a shape applied. Median of 60 frames after warm-up, on a Windows laptop.
 
-| particles | median step | of a 60 fps frame | p95 |
-|---|---|---|---|
-| 1,000 | 1.0 ms | 6% | 2.2 ms |
-| 3,000 | 2.5 ms | 15% | 3.6 ms |
-| 6,000 | 2.2 ms | 13% | 6.7 ms |
-| 10,000 | 5.7 ms | 34% | 10.8 ms |
-| 15,000 | 5.2 ms | 31% | 15.7 ms |
-| 25,000 | 8.0 ms | 48% | 23.6 ms |
-| 50,000 | 24.5 ms | over budget | 40.3 ms |
+| particles | median step | of a 60 fps frame | p95     |
+| --------- | ----------- | ----------------- | ------- |
+| 1,000     | 1.0 ms      | 6%                | 2.2 ms  |
+| 3,000     | 2.5 ms      | 15%               | 3.6 ms  |
+| 6,000     | 2.2 ms      | 13%               | 6.7 ms  |
+| 10,000    | 5.7 ms      | 34%               | 10.8 ms |
+| 15,000    | 5.2 ms      | 31%               | 15.7 ms |
+| 25,000    | 8.0 ms      | 48%               | 23.6 ms |
+| 50,000    | 24.5 ms     | over budget       | 40.3 ms |
 
 Two caveats worth stating plainly. This measures CPU time — the simulation, the packing loop, and issuing the GL calls. GPU rasterisation happens asynchronously and is not included, so on a fill-rate-limited device (most phones) the real ceiling is lower and `maxDpr` matters more than this table suggests. And the non-monotonic rows are JIT warm-up noise, not a real effect.
 

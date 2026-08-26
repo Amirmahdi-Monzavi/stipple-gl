@@ -4,7 +4,7 @@ export const defaultOptions: StippleOptions = {
   count: 3500,
   minorCount: 260,
   mode: 'background',
-  color: '#4f9c7d',
+  color: '#5ec8f2',
   minorColor: null,
   background: '',
   opacity: 1,
@@ -53,9 +53,9 @@ export const defaultOptions: StippleOptions = {
   },
   assign: 'angular',
   transition: {
-    enter: 'sweep',
+    enter: 'condense',
     exit: 'mirror',
-    swap: 'sweep',
+    swap: 'condense',
   },
   spread: {
     radius: 0.62,
@@ -101,6 +101,16 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 export const mergeOptions = <T>(base: T, patch: unknown): T => {
   if (patch === undefined) return base;
   if (!isPlainObject(patch) || !isPlainObject(base)) return patch as T;
+
+  // A tagged union member replaces rather than merges. `color` can be a ramp or
+  // a shape source, and deep-merging one onto the other leaves the previous
+  // variant's keys behind on an object that no longer means them — switching a
+  // ramp to `{ type: 'shape' }` produced a shape spec still carrying `from`,
+  // `to` and `by`. Nothing reads them, but `options.color` then no longer
+  // reflects what the caller passed, which is its own kind of wrong.
+  if (typeof patch['type'] === 'string' && typeof base['type'] === 'string') {
+    if (patch['type'] !== base['type']) return patch as T;
+  }
 
   const out: Record<string, unknown> = { ...base };
   for (const key of Object.keys(patch)) {

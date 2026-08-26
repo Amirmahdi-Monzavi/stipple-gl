@@ -18,12 +18,4 @@ export {
   easeOutBack,
   easeInOutElastic,
 } from './core/math';
-export {
-  morph,
-  snap,
-  starfield,
-  constellation,
-  nebula,
-  dust,
-  presets,
-} from './presets/index';
+export { morph, snap, starfield, constellation, nebula, dust, presets } from './presets/index';

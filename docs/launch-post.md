@@ -12,7 +12,7 @@ Replace `github.com/…` and the playground URL before posting. Attach a screen 
 >
 > It wasn't the easing. It was an assignment problem.
 >
-> When a cloud of particles morphs into a shape, you sample the shape into N points and move N particles onto them. The part nobody mentions is *which particle goes to which point*. I was pairing them randomly. So a particle on the left of the cloud would fly to the right of the shape, crossing paths with hundreds of others. The result reads as static resolving into an image.
+> When a cloud of particles morphs into a shape, you sample the shape into N points and move N particles onto them. The part nobody mentions is _which particle goes to which point_. I was pairing them randomly. So a particle on the left of the cloud would fly to the right of the shape, crossing paths with hundreds of others. The result reads as static resolving into an image.
 >
 > The fix took about thirty lines: sort the particles by their angle around the cloud's centre, sort the sampled points by their angle around the shape's centre, and pair the two sorted orders. Particles keep their rough angular position through the transition, so the shape appears to condense rather than reshuffle.
 >

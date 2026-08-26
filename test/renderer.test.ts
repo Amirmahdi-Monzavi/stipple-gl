@@ -4,8 +4,7 @@ import { resolve } from 'node:path';
 
 import { POINT_FRAGMENT_SHADER, POINT_VERTEX_SHADER } from '../src/core/shaders';
 
-const read = (relative: string): string =>
-  readFileSync(resolve(process.cwd(), relative), 'utf8');
+const read = (relative: string): string => readFileSync(resolve(process.cwd(), relative), 'utf8');
 
 const runtimeSource = read('src/core/runtime.ts');
 const rendererSource = read('src/core/renderer.ts');
@@ -27,7 +26,9 @@ describe('WebGL context attributes', () => {
 
 describe('alpha pipeline', () => {
   it('emits premultiplied colour from the fragment shader', () => {
-    expect(POINT_FRAGMENT_SHADER).toMatch(/outColor\s*=\s*vec4\(\s*vColor\.rgb\s*\*\s*alpha\s*,\s*alpha\s*\)/);
+    expect(POINT_FRAGMENT_SHADER).toMatch(
+      /outColor\s*=\s*vec4\(\s*vColor\.rgb\s*\*\s*alpha\s*,\s*alpha\s*\)/,
+    );
   });
 
   it('pairs premultiplied output with premultiplied blend factors', () => {
@@ -52,7 +53,13 @@ describe('worker parity', () => {
   });
 
   it('keeps DOM APIs out of the worker thread', () => {
-    for (const api of ['document', 'window', 'ResizeObserver', 'IntersectionObserver', 'DOMParser']) {
+    for (const api of [
+      'document',
+      'window',
+      'ResizeObserver',
+      'IntersectionObserver',
+      'DOMParser',
+    ]) {
       expect(threadSource, api).not.toMatch(new RegExp('\b' + api + '\b'));
     }
   });

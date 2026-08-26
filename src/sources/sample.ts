@@ -1,4 +1,4 @@
-import type { ImageSource, SampledShape, ShapeConfig, ShapeDetail } from '../core/types';
+import type { ImageMask, ImageSource, SampledShape, ShapeConfig, ShapeDetail } from '../core/types';
 
 export interface SampleSettings {
   maxRaster: number;
@@ -40,10 +40,11 @@ const acquireRaster = (width: number, height: number): Raster => {
       ? new OffscreenCanvas(width, height)
       : Object.assign(document.createElement('canvas'), { width, height });
 
+  // The union of HTMLCanvasElement and OffscreenCanvas widens getContext's return
+  // to RenderingContext, which is not what either branch actually yields. The
+  // assertion is load-bearing, not decorative.
   const ctx = canvas.getContext('2d', { willReadFrequently: true }) as
-    | CanvasRenderingContext2D
-    | OffscreenCanvasRenderingContext2D
-    | null;
+    CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
 
   if (!ctx) throw new Error('stipple-gl: 2D canvas context unavailable for shape sampling');
 
@@ -107,6 +108,66 @@ const drawPaths = (
       ctx.fill(path, entry.evenOdd ? 'evenodd' : 'nonzero');
     }
   }
+};
+
+/**
+ * Pick a mask by looking at the pixels.
+ *
+ * Real transparency means the alpha channel is the silhouette and nothing else
+ * needs deciding. Without it — a JPEG, a scan, clipart on a white background —
+ * alpha masking would call every pixel ink and hand back the source rectangle,
+ * so fall through to luminance and keep whichever side is the minority. Ink is
+ * the thing there is less of; a page is mostly not-ink.
+ */
+const resolveMask = (
+  pixels: Uint8ClampedArray,
+  width: number,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+): Exclude<ImageMask, 'auto'> => {
+  // Only the drawn rectangle counts. The raster is larger than the image — the
+  // fit leaves transparent margin on two sides — and counting that margin makes
+  // every source look like it has transparency, which is what this is deciding.
+  const x0 = Math.max(0, Math.ceil(rect.x0));
+  const y0 = Math.max(0, Math.ceil(rect.y0));
+  const x1 = Math.min(width, Math.floor(rect.x1));
+  const y1 = Math.min(pixels.length / 4 / width, Math.floor(rect.y1));
+  if (x1 <= x0 || y1 <= y0) return 'alpha';
+
+  // Sample rather than sweep: a few thousand pixels settle this, and the caller
+  // is already paying for a decode.
+  const step = Math.max(1, Math.floor(Math.sqrt(((x1 - x0) * (y1 - y0)) / 4096)));
+  let seen = 0;
+  let transparent = 0;
+  let dark = 0;
+
+  for (let y = y0; y < y1; y += step) {
+    for (let x = x0; x < x1; x += step) {
+      const o = (y * width + x) * 4;
+      seen++;
+      if (pixels[o + 3]! < 250) {
+        transparent++;
+        continue;
+      }
+      if (0.2126 * pixels[o]! + 0.7152 * pixels[o + 1]! + 0.0722 * pixels[o + 2]! < 128) dark++;
+    }
+  }
+
+  if (seen === 0) return 'alpha';
+  // 2% is enough to mean the artwork was authored with a cut-out background,
+  // and low enough not to trip on a stray antialiased pixel.
+  if (transparent / seen > 0.02) return 'alpha';
+
+  const opaque = seen - transparent;
+  if (opaque === 0) return 'alpha';
+
+  // One flat colour has no figure to separate from ground. Splitting it by
+  // luminance would put every pixel on one side and none on the other, and the
+  // minority rule would then discard the entire image. The rectangle is the
+  // honest answer for a source that contains nothing else.
+  const darkShare = dark / opaque;
+  if (darkShare < 0.005 || darkShare > 0.995) return 'alpha';
+
+  return dark <= opaque - dark ? 'dark' : 'light';
 };
 
 let weightScratch = new Float32Array(0);
@@ -228,6 +289,8 @@ export const sampleShape = (
 
   // A raster source carries its own colour, so it is always sampled tinted.
   let tinted = hasImage;
+  // Where the image actually landed, for mask auto-detection.
+  let drawn = { x0: 0, y0: 0, x1: rw, y1: rh };
 
   if (hasImage) {
     const image = shape.image!;
@@ -239,7 +302,10 @@ export const sampleShape = (
     const dw = iw * fit;
     const dh = ih * fit;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.drawImage(image as CanvasImageSource, rw * position.x - dw / 2, rh * position.y - dh / 2, dw, dh);
+    const dx = rw * position.x - dw / 2;
+    const dy = rh * position.y - dh / 2;
+    drawn = { x0: dx, y0: dy, x1: dx + dw, y1: dy + dh };
+    ctx.drawImage(image, dx, dy, dw, dh);
   } else {
     const [vbx, vby, vbw, vbh] = parseViewBox(shape.viewBox);
     const fit = Math.min(rw / vbw, rh / vbh) * scale;
@@ -264,7 +330,8 @@ export const sampleShape = (
   // Which pixels count as ink. Alpha is right for anything with transparency;
   // a photo or a JPEG is opaque everywhere, so it needs a luminance cutoff or
   // the whole rectangle becomes the shape.
-  const mask = shape.mask ?? 'alpha';
+  const requested = shape.mask ?? 'auto';
+  const mask = requested === 'auto' ? resolveMask(pixels, rw, drawn) : requested;
   const threshold = shape.threshold ?? (mask === 'alpha' ? 0.03 : 0.5);
   const alphaFloor = mask === 'alpha' ? threshold * 255 : 8;
   const lumCutoff = threshold * 255;
@@ -287,7 +354,9 @@ export const sampleShape = (
 
   const detail = shape.detail ?? 'uniform';
   const weights =
-    detail === 'uniform' ? null : buildWeights(pixels, hits, hitCount, rw, rh, detail, shape.detailStrength ?? 0.85);
+    detail === 'uniform'
+      ? null
+      : buildWeights(pixels, hits, hitCount, rw, rh, detail, shape.detailStrength ?? 0.85);
 
   // Stratified inverse-CDF sampling. With no weights the running total is just
   // the index, so this reduces exactly to the even stride it replaces.
@@ -328,7 +397,9 @@ export const sampleShape = (
   return { points: out, colors: tints };
 };
 
-export const shapeBounds = (points: Float32Array): {
+export const shapeBounds = (
+  points: Float32Array,
+): {
   minX: number;
   minY: number;
   maxX: number;

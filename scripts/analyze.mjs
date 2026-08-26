@@ -29,9 +29,7 @@ const total = rows.reduce((sum, [, bytes]) => sum + bytes, 0);
 
 console.log(`entry: ${target}`);
 console.log(`minified total: ${(total / 1024).toFixed(2)} KB`);
-console.log(
-  `gzipped: ${(gzipSync(result.outputFiles[0].contents).length / 1024).toFixed(2)} KB\n`,
-);
+console.log(`gzipped: ${(gzipSync(result.outputFiles[0].contents).length / 1024).toFixed(2)} KB\n`);
 
 for (const [file, bytes] of rows) {
   const pct = ((bytes / total) * 100).toFixed(1);

@@ -55,14 +55,14 @@ Because the shape swap happens exactly when the closest section changes — whic
 
 ## Options
 
-| option | type | default | description |
-|---|---|---|---|
-| `sections` | `string \| HTMLElement[]` | — | Selector or explicit element list. |
-| `shapes` | `Record<string, ShapeConfig \| string \| null>` | — | Maps attribute values to shapes. `null` disperses. |
-| `attribute` | `string` | `'data-stipple-shape'` | Attribute read from each section. |
-| `fadeRange` | `number` | `0.62` | Fraction of travel over which the morph fades. Lower holds the shape longer. |
-| `root` | `HTMLElement \| null` | `null` | Scroll container. `null` uses the window. |
-| `onChange` | `(key, section) => void` | — | Fires when the active section changes. |
+| option      | type                                            | default                | description                                                                  |
+| ----------- | ----------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------- |
+| `sections`  | `string \| HTMLElement[]`                       | —                      | Selector or explicit element list.                                           |
+| `shapes`    | `Record<string, ShapeConfig \| string \| null>` | —                      | Maps attribute values to shapes. `null` disperses.                           |
+| `attribute` | `string`                                        | `'data-stipple-shape'` | Attribute read from each section.                                            |
+| `fadeRange` | `number`                                        | `0.62`                 | Fraction of travel over which the morph fades. Lower holds the shape longer. |
+| `root`      | `HTMLElement \| null`                           | `null`                 | Scroll container. `null` uses the window.                                    |
+| `onChange`  | `(key, section) => void`                        | —                      | Fires when the active section changes.                                       |
 
 Returns `{ refresh(), destroy(), activeKey }`. Call `refresh()` after adding or removing sections; always `destroy()` on teardown.
 

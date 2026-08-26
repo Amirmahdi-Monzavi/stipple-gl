@@ -18,13 +18,7 @@ export const useMorphOnScroll = (
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
-  const {
-    sections = '[data-stipple-shape]',
-    enabled = true,
-    attribute,
-    fadeRange,
-    root,
-  } = options;
+  const { sections = '[data-stipple-shape]', enabled = true, attribute, fadeRange, root } = options;
 
   const shapeKeys = Object.keys(options.shapes).sort().join('|');
 

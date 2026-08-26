@@ -181,7 +181,11 @@ export const shapeElementToPath = (element: Element): string | null => {
   if (tag === 'polyline' || tag === 'polygon') {
     const points = element.getAttribute('points');
     if (!points) return null;
-    const coords = points.trim().split(/[\s,]+/).map(Number).filter(Number.isFinite);
+    const coords = points
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number)
+      .filter(Number.isFinite);
     if (coords.length < 4) return null;
     let path = 'M ' + coords[0] + ' ' + coords[1];
     for (let i = 2; i < coords.length - 1; i += 2) {
@@ -246,17 +250,13 @@ const isPaintServer = (value: string): boolean => value.startsWith('url(');
 const usableColor = (value: string | null): string | undefined => {
   if (!value) return undefined;
   const trimmed = value.trim();
-  if (trimmed === 'none' || trimmed === 'currentColor' || trimmed === 'transparent') return undefined;
+  if (trimmed === 'none' || trimmed === 'currentColor' || trimmed === 'transparent')
+    return undefined;
   if (isPaintServer(trimmed)) return undefined;
   return trimmed;
 };
 
-const collect = (
-  root: Element,
-  inherited: Matrix,
-  out: SVGPathData[],
-  paint: Painted,
-): void => {
+const collect = (root: Element, inherited: Matrix, out: SVGPathData[], paint: Painted): void => {
   for (const child of Array.from(root.children)) {
     const tag = child.tagName.toLowerCase();
     if (SKIP_TAGS.has(tag)) continue;
@@ -269,7 +269,8 @@ const collect = (
       continue;
     }
 
-    const d = tag === 'path' ? (child.getAttribute('d')?.trim() ?? null) : shapeElementToPath(child);
+    const d =
+      tag === 'path' ? (child.getAttribute('d')?.trim() ?? null) : shapeElementToPath(child);
     if (!d) continue;
 
     const fill = painted.fill;
@@ -306,7 +307,15 @@ const collect = (
 
 export const parseSVG = (source: string): SVGShapeData => {
   const doc = new DOMParser().parseFromString(source, 'image/svg+xml');
-  if (doc.querySelector('parsererror')) throw new Error('stipple-gl: invalid SVG markup');
+
+  const failure = doc.querySelector('parsererror');
+  if (failure) {
+    // SVG is parsed as XML, so it is strict — an undeclared namespace prefix or
+    // an unclosed tag is fatal. Pass the parser's own complaint through: "invalid
+    // SVG markup" alone leaves the caller with a file and no idea where to look.
+    const detail = (failure.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
+    throw new Error('stipple-gl: invalid SVG markup' + (detail ? ' — ' + detail : ''));
+  }
 
   const svg = doc.querySelector('svg');
   if (!svg) throw new Error('stipple-gl: no <svg> root element found');
@@ -321,7 +330,12 @@ export const parseSVG = (source: string): SVGShapeData => {
   const paths: SVGPathData[] = [];
   // The root can carry the paint everything inherits —  on <svg>
   // is how nearly every stroked icon set is authored.
-  collect(svg, IDENTITY, paths, paintOf(svg, { fill: null, stroke: null, strokeWidth: null, fillRule: null }));
+  collect(
+    svg,
+    IDENTITY,
+    paths,
+    paintOf(svg, { fill: null, stroke: null, strokeWidth: null, fillRule: null }),
+  );
   if (paths.length === 0) throw new Error('stipple-gl: no drawable geometry found in SVG');
 
   const result: SVGShapeData = { paths, viewBox };

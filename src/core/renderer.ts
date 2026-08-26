@@ -17,7 +17,7 @@ const compile = (gl: WebGL2RenderingContext, type: number, source: string): WebG
 };
 
 const link = (gl: WebGL2RenderingContext, vs: string, fs: string): WebGLProgram => {
-  const program = gl.createProgram()!;
+  const program = gl.createProgram();
   const vertex = compile(gl, gl.VERTEX_SHADER, vs);
   const fragment = compile(gl, gl.FRAGMENT_SHADER, fs);
   gl.attachShader(program, vertex);
@@ -130,13 +130,7 @@ export class PointRenderer {
     gl.useProgram(this.program);
     gl.bindVertexArray(this.vao);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vbo);
-    gl.bufferSubData(
-      gl.ARRAY_BUFFER,
-      0,
-      this.floats,
-      0,
-      vertexCount * FLOATS_PER_VERTEX,
-    );
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.floats, 0, vertexCount * FLOATS_PER_VERTEX);
 
     gl.uniform2f(this.uCamOffset, camOffsetX, camOffsetY);
     gl.uniform1f(this.uCamScale, camScale);

@@ -12,13 +12,13 @@ stipple.morphTo(await shapeFromFile(file));
 
 ## What is supported
 
-| source | how | notes |
-|---|---|---|
-| SVG | vector, or rasterised | Traced as paths by default. Rasterised automatically when the markup needs it — see below. |
-| PNG | raster | Alpha channel is the mask. The obvious choice for a logo with transparency. |
-| WebP, AVIF, GIF | raster | Same as PNG. Animated sources sample their first frame. |
-| JPEG | raster | No alpha, so use `mask: 'dark'` or `'light'` — see [Photographs](#photographs). |
-| `<canvas>`, `<video>`, `ImageBitmap` | raster | Anything `drawImage` accepts. Sample a video frame to morph into live footage. |
+| source                               | how                   | notes                                                                                      |
+| ------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------ |
+| SVG                                  | vector, or rasterised | Traced as paths by default. Rasterised automatically when the markup needs it — see below. |
+| PNG                                  | raster                | Alpha channel is the mask. The obvious choice for a logo with transparency.                |
+| WebP, AVIF, GIF                      | raster                | Same as PNG. Animated sources sample their first frame.                                    |
+| JPEG                                 | raster                | No alpha, so use `mask: 'dark'` or `'light'` — see [Photographs](#photographs).            |
+| `<canvas>`, `<video>`, `ImageBitmap` | raster                | Anything `drawImage` accepts. Sample a video frame to morph into live footage.             |
 
 There is no format list in the library. Raster decoding goes through `createImageBitmap`, so **whatever the browser can decode, this can sample.**
 
@@ -35,9 +35,9 @@ Path2D draws flat fills and strokes and nothing else. Gradients, filters, patter
 ```ts
 import { shapeFromString, shapeFromSVGImage, shapeFromFile } from 'stipple-gl';
 
-shapeFromString(source);                          // always vector
-await shapeFromSVGImage(source);                  // always raster
-await shapeFromFile(file);                        // auto
+shapeFromString(source); // always vector
+await shapeFromSVGImage(source); // always raster
+await shapeFromFile(file); // auto
 await shapeFromFile(file, { forceRaster: true }); // auto, overridden
 ```
 
@@ -53,24 +53,25 @@ This matters more than it sounds: filling an open outline path does not produce 
 
 ## Photographs
 
-An opaque image has no alpha to mask with, so under the default `mask: 'alpha'` every pixel is ink and the shape is the rectangle. Use luminance instead:
+An opaque image has no alpha to mask with: every pixel qualifies, and the "shape" comes out as the source rectangle with a border around it. The default `mask: 'auto'` notices this and switches to luminance for you, so a photograph or a scan works with no configuration at all. You can still say it explicitly:
 
 ```ts
 await shapeFromFile(photo, { mask: 'dark', threshold: 0.45 });
 ```
 
-| `mask` | ink is |
-|---|---|
-| `'alpha'` | anything not transparent — the default, right for PNG and SVG |
-| `'dark'` | opaque pixels **below** the luminance threshold — a dark subject on a light ground |
-| `'light'` | opaque pixels **above** it — a light subject on a dark ground |
+| `mask`    | ink is                                                                                                                                                           |
+| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'auto'`  | **the default.** Inspects the image: real transparency means alpha, otherwise it falls through to luminance and keeps whichever of dark or light is the minority |
+| `'alpha'` | anything not transparent — right for PNG and SVG with a cut-out background                                                                                       |
+| `'dark'`  | opaque pixels **below** the luminance threshold — a dark subject on a light ground                                                                               |
+| `'light'` | opaque pixels **above** it — a light subject on a dark ground                                                                                                    |
 
 `threshold` runs 0 to 1 and defaults to `0.5` for the luminance masks. Push it toward 0 to keep only the deepest shadows, toward 1 to keep almost everything.
 
 Pair a photo with `color: { type: 'shape' }` and the field takes the photograph's own palette.
 
 ```ts
-new Stipple('#hero', { color: { type: 'shape', fallback: '#4f9c7d' } });
+new Stipple('#hero', { color: { type: 'shape', fallback: '#5ec8f2' } });
 ```
 
 ---
@@ -85,7 +86,7 @@ await shapeFromImageURL('/logo.png', { scale: 0.7 });
 const bitmap = await imageFromURL('/logo.png');
 shapeFromImage(bitmap);
 
-shapeFromImage(document.querySelector('video'));   // a live frame
+shapeFromImage(document.querySelector('video')); // a live frame
 shapeFromImage(myCanvas);
 ```
 
@@ -111,15 +112,15 @@ The decode is the expensive half and it is asynchronous, which is why the image 
 
 ## Where the particles go
 
-Sampling picks points from the ink with equal probability. For line art that is exactly right — the ink *is* the drawing. For a flat-filled illustration it is not, and the result is a silhouette.
+Sampling picks points from the ink with equal probability. For line art that is exactly right — the ink _is_ the drawing. For a flat-filled illustration it is not, and the result is a silhouette.
 
 The reason is arithmetic. Measured on two typical illustrations:
 
-| artwork | ink pixels | edge pixels | largest flat region |
-|---|---|---|---|
-| line-art cat | 1,352 | — | one colour throughout |
-| filled figure | 29,056 | 14% of ink | 61% of ink |
-| filled scene | 30,018 | 17% of ink | 36% of ink |
+| artwork       | ink pixels | edge pixels | largest flat region   |
+| ------------- | ---------- | ----------- | --------------------- |
+| line-art cat  | 1,352      | —           | one colour throughout |
+| filled figure | 29,056     | 14% of ink  | 61% of ink            |
+| filled scene  | 30,018     | 17% of ink  | 36% of ink            |
 
 A filled illustration is mostly interior. Spread 6,000 particles evenly over it and roughly 86% land somewhere with nothing to see, so what reads is the outline of the whole mass. The line-art cat has no interior to waste budget on, which is why it looks right with no help.
 
@@ -129,20 +130,20 @@ A filled illustration is mostly interior. Spread 6,000 particles evenly over it 
 await shapeFromFile(file, { detail: 'edges' });
 ```
 
-| `detail` | budget goes to |
-|---|---|
-| `'uniform'` | every ink pixel equally — the default, right for line art and logos |
-| `'edges'` | contours and colour boundaries — turns a filled illustration back into a drawing |
-| `'density'` | dark ink, in the manner of traditional stippling |
+| `detail`    | budget goes to                                                                   |
+| ----------- | -------------------------------------------------------------------------------- |
+| `'uniform'` | every ink pixel equally — the default, right for line art and logos              |
+| `'edges'`   | contours and colour boundaries — turns a filled illustration back into a drawing |
+| `'density'` | dark ink, in the manner of traditional stippling                                 |
 
 `detailStrength` (0 to 1, default `0.85`) sets how hard it is applied. The tradeoff is measured, and worth knowing before you reach for `1`:
 
 | strength | points on edges | area still covered |
-|---|---|---|
-| `0` | 14% | 1,525 cells |
-| `0.5` | 19% | 1,521 cells |
-| `0.85` | 33% | 1,474 cells |
-| `1` | 62% | 486 cells |
+| -------- | --------------- | ------------------ |
+| `0`      | 14%             | 1,525 cells        |
+| `0.5`    | 19%             | 1,521 cells        |
+| `0.85`   | 33%             | 1,474 cells        |
+| `1`      | 62%             | 486 cells          |
 
 At the default you get **2.4× the contour definition for a 3% loss of coverage**. At `1` you get true line art — and a hollow shape, because the interior is abandoned entirely. That is a legitimate look; just pick it deliberately.
 

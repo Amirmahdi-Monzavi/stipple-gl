@@ -66,5 +66,13 @@ export function ConsentCard() {
 }
 
 export function AmbientBackground() {
-  return <Particles count={0} minorCount={700} color="#8ab4f8" opacity={0.6} pointer={{ enabled: false }} />;
+  return (
+    <Particles
+      count={0}
+      minorCount={700}
+      color="#8ab4f8"
+      opacity={0.6}
+      pointer={{ enabled: false }}
+    />
+  );
 }

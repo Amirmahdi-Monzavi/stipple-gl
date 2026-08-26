@@ -7,3 +7,6 @@ coverage/
 .probe.ts
 *.log
 .vite/
+visual/.results/
+playwright-report/
+test-results/

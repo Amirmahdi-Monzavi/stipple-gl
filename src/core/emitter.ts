@@ -24,12 +24,12 @@ export class MorphEmitter {
       set = new Set();
       this.handlers.set(event, set);
     }
-    set.add(handler as Handler<never>);
+    set.add(handler);
     return () => this.off(event, handler);
   }
 
   off<E extends StippleEvent>(event: E, handler: Handler<E>): void {
-    this.handlers.get(event)?.delete(handler as Handler<never>);
+    this.handlers.get(event)?.delete(handler);
   }
 
   emit<E extends StippleEvent>(event: E, payload: StippleEventMap[E]): void {

@@ -84,7 +84,7 @@ describe('changing shape after a preset switch', () => {
 
     // Switch preset exactly the way the playground does.
     runtime.setOptions(mergeOptions(defaultOptions, { ...presets.snap, mode: 'background' }));
-    runtime.setCount(presets.snap.count!, presets.snap.minorCount!);
+    runtime.setCount(presets.snap.count!, presets.snap.minorCount);
 
     // Then pick a different shape.
     runtime.setShape(shape('second'));

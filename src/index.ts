@@ -46,7 +46,13 @@ export {
   createEmissionBehavior,
 } from './behaviors';
 
-export { parseSVG, loadSVG, clearSVGCache, parseTransform, shapeElementToPath } from './sources/svg';
+export {
+  parseSVG,
+  loadSVG,
+  clearSVGCache,
+  parseTransform,
+  shapeElementToPath,
+} from './sources/svg';
 export { sampleShape, shapeBounds, releaseRaster, defaultSampleSettings } from './sources/sample';
 export type { SampleSettings } from './sources/sample';
 export { assignTargets, releaseAssignScratch } from './sources/assign';

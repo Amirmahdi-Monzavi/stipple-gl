@@ -18,7 +18,9 @@ export default defineConfig([
     clean: true,
     treeshake: true,
     splitting: true,
-    sourcemap: true,
+    // Not shipped: maps were 68% of the package, and a dangling
+    // sourceMappingURL is a 404 in every consumer devtools session.
+    sourcemap: false,
     minify: false,
     target: 'es2022',
     external: ['react', 'react-dom'],
@@ -36,7 +38,9 @@ export default defineConfig([
     clean: false,
     treeshake: true,
     splitting: false,
-    sourcemap: true,
+    // Not shipped: maps were 68% of the package, and a dangling
+    // sourceMappingURL is a 404 in every consumer devtools session.
+    sourcemap: false,
     minify: true,
     target: 'es2020',
     define: { 'process.env.NODE_ENV': '"production"' },

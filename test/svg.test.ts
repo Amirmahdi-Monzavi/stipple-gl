@@ -55,7 +55,9 @@ describe('parseSVG', () => {
 
   it('ignores defs, masks and clip paths', () => {
     const result = parseSVG(
-      svg('<defs><path d="M9 9 L9 9"/></defs><clipPath><rect width="4" height="4"/></clipPath><path d="M0 0 L1 1"/>'),
+      svg(
+        '<defs><path d="M9 9 L9 9"/></defs><clipPath><rect width="4" height="4"/></clipPath><path d="M0 0 L1 1"/>',
+      ),
     );
     expect(result.paths).toHaveLength(1);
     expect(result.paths[0]!.d).toBe('M0 0 L1 1');

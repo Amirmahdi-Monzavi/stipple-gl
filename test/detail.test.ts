@@ -33,7 +33,10 @@ beforeAll(() => {
           const u = (px - dx) / dw;
           const v = (py - dy) / dh;
           if (u < 0 || u >= 1 || v < 0 || v >= 1) continue;
-          const [r, g, b, a] = image.__fill(Math.floor(u * image.width), Math.floor(v * image.height));
+          const [r, g, b, a] = image.__fill(
+            Math.floor(u * image.width),
+            Math.floor(v * image.height),
+          );
           const o = (py * painted.width + px) * 4;
           painted.data[o] = r!;
           painted.data[o + 1] = g!;
@@ -50,7 +53,7 @@ beforeAll(() => {
   (globalThis as { OffscreenCanvas?: unknown }).OffscreenCanvas = class {
     constructor(w: number, h: number) {
       painted = { width: w, height: h, data: new Uint8ClampedArray(w * h * 4) };
-      return { width: w, height: h, getContext: () => ctx } as never;
+      return { width: w, height: h, getContext: () => ctx };
     }
   };
 });
@@ -121,7 +124,11 @@ const flatDisc = stubImage(80, 80, (x, y) =>
 
 describe('flat single-colour shapes', () => {
   const sampleDisc = (detail: ShapeDetail, detailStrength: number) => {
-    const shape: ShapeConfig = { ...shapeFromImage(flatDisc, { scale: 1 }), detail, detailStrength };
+    const shape: ShapeConfig = {
+      ...shapeFromImage(flatDisc, { scale: 1 }),
+      detail,
+      detailStrength,
+    };
     return sampleShape(shape, 2000, 256, 256, { maxRaster: 256, jitter: 0 });
   };
 

@@ -42,8 +42,21 @@ const spawn = (
 };
 
 const FIELDS = [
-  'x', 'y', 'z', 'vx', 'vy', 'vz', 'life', 'maxLife',
-  'size', 'baseSize', 'opacity', 'angle', 'r', 'g', 'b',
+  'x',
+  'y',
+  'z',
+  'vx',
+  'vy',
+  'vz',
+  'life',
+  'maxLife',
+  'size',
+  'baseSize',
+  'opacity',
+  'angle',
+  'r',
+  'g',
+  'b',
 ] as const;
 
 const remove = (emission: EmissionState, i: number): void => {
@@ -82,14 +95,36 @@ export const createEmissionBehavior = (): Behavior => ({
         const burst = (minBurst + Math.random() * (maxBurst - minBurst + 1)) | 0;
         for (let n = 0; n < burst; n++) {
           if (emission.count >= limit) break;
-          spawn(emission, major.x[i]!, major.y[i]!, major.z[i]!, false, config.lifespan, config.speed, r, g, b);
+          spawn(
+            emission,
+            major.x[i]!,
+            major.y[i]!,
+            major.z[i]!,
+            false,
+            config.lifespan,
+            config.speed,
+            r,
+            g,
+            b,
+          );
         }
         if (emission.count >= limit) break;
       }
     } else if (spread && emission.count < limit) {
       for (let i = 0; i < major.count; i += 8) {
         if (major.glow[i]! < 0.9 || Math.random() >= 0.0004) continue;
-        spawn(emission, major.x[i]!, major.y[i]!, major.z[i]!, true, config.lifespan, config.speed, r, g, b);
+        spawn(
+          emission,
+          major.x[i]!,
+          major.y[i]!,
+          major.z[i]!,
+          true,
+          config.lifespan,
+          config.speed,
+          r,
+          g,
+          b,
+        );
         if (emission.count >= limit) break;
       }
     }

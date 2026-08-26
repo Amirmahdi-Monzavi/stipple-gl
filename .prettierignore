@@ -1,0 +1,7 @@
+dist
+dist-playground
+node_modules
+coverage
+pnpm-lock.yaml
+visual/__screenshots__
+visual/.results

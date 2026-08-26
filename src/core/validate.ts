@@ -36,10 +36,9 @@ const CHOREOGRAPHY_RANGES: Record<string, [number, number]> = {
 };
 
 const ORDERS = ['random', 'x', 'y', 'radial', 'radar'];
-const NAMES = ['uniform', 'sweep', 'burst'];
+const NAMES = ['condense', 'uniform', 'sweep', 'burst'];
 
 const warn = (message: string): void => {
-  // eslint-disable-next-line no-console
   console.warn('stipple-gl: ' + message);
 };
 
@@ -58,9 +57,7 @@ const checkUnknownKeys = (value: unknown, reference: unknown, path: string): voi
 
     if (!(key in reference)) {
       const candidates = Object.keys(reference);
-      const near = candidates.find(
-        (candidate) => candidate.toLowerCase() === key.toLowerCase(),
-      );
+      const near = candidates.find((candidate) => candidate.toLowerCase() === key.toLowerCase());
       warn(
         'unknown option "' +
           full +
@@ -84,9 +81,7 @@ const checkRange = (path: string, value: unknown): void => {
     return;
   }
   if (value < range[0] || value > range[1]) {
-    warn(
-      path + ' is ' + value + ', outside the usable range ' + range[0] + '..' + range[1] + '.',
-    );
+    warn(path + ' is ' + value + ', outside the usable range ' + range[0] + '..' + range[1] + '.');
   }
 };
 

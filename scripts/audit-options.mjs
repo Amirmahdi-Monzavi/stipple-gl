@@ -20,7 +20,9 @@ const defaults = optionsText
   .split('export const defaultOptions')[1]
   .split('const isPlainObject')[0];
 
-const leaves = [...new Set([...defaults.matchAll(/^ {2,6}([a-zA-Z][a-zA-Z0-9]*):/gm)].map((m) => m[1]))].sort();
+const leaves = [
+  ...new Set([...defaults.matchAll(/^ {2,6}([a-zA-Z][a-zA-Z0-9]*):/gm)].map((m) => m[1])),
+].sort();
 
 const consumersFor = (name) => {
   const pattern = new RegExp('\\.' + name + '\\b');

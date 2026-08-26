@@ -6,8 +6,10 @@
   --border-strong: rgba(255, 255, 255, 0.16);
   --text: #e8eef5;
   --muted: #7a8797;
-  --accent: #4f9c7d;
-  --accent-soft: rgba(79, 156, 125, 0.16);
+  --accent: #5ec8f2;
+  --accent-soft: rgba(94, 200, 242, 0.16);
+  --scroll-thumb: rgba(255, 255, 255, 0.14);
+  --scroll-thumb-hover: rgba(255, 255, 255, 0.24);
   --radius: 12px;
   --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
@@ -33,7 +35,7 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(120% 80% at 50% 0%, rgba(79, 156, 125, 0.08), transparent 60%),
+    radial-gradient(120% 80% at 50% 0%, rgba(94, 200, 242, 0.07), transparent 60%),
     radial-gradient(80% 60% at 80% 100%, rgba(60, 120, 190, 0.06), transparent 60%);
   pointer-events: none;
   z-index: 1;
@@ -87,6 +89,111 @@ body::before {
   font-variant-numeric: tabular-nums;
 }
 
+/* The name is one flex item, so the container gap only separates it from the dot. */
+.wordmark-name {
+  white-space: nowrap;
+}
+
+.masthead-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  pointer-events: auto;
+}
+
+/*
+ * Lives in the masthead rather than the panel, because the in-panel control
+ * slides away with the panel and leaves no way back.
+ */
+kbd {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+}
+
+.panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: rgba(12, 17, 24, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 11px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+.panel-toggle:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.panel-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  color: var(--text);
+}
+
+.panel-toggle-bars {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: 12px;
+}
+
+.panel-toggle-bars i {
+  display: block;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transition: width 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.panel-toggle-bars i:nth-child(1) {
+  width: 12px;
+}
+.panel-toggle-bars i:nth-child(2) {
+  width: 8px;
+}
+.panel-toggle-bars i:nth-child(3) {
+  width: 10px;
+}
+
+.panel-toggle.is-collapsed .panel-toggle-bars i:nth-child(2) {
+  width: 12px;
+}
+.panel-toggle.is-collapsed .panel-toggle-bars i:nth-child(3) {
+  width: 12px;
+}
+
+button.ghost.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  line-height: 0;
+  border-color: transparent;
+}
+
+button.ghost.icon:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
 .panel {
   position: fixed;
   top: 64px;
@@ -134,13 +241,38 @@ body::before {
   padding: 6px 0 10px;
 }
 
+/* Scrollbar — thin, quiet, and the same in Firefox as in Chromium. */
+.panel-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll-thumb) transparent;
+}
+
 .panel-body::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+}
+
+.panel-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .panel-body::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 8px;
+  background: var(--scroll-thumb);
+  border-radius: 999px;
+  /* Border rather than width, so the thumb insets without shrinking the track
+     and the whole 10px stays grabbable. */
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 160ms ease;
+}
+
+.panel-body:hover::-webkit-scrollbar-thumb {
+  background: var(--scroll-thumb-hover);
+  background-clip: padding-box;
+}
+
+.panel-body::-webkit-scrollbar-thumb:active {
+  background: var(--accent);
+  background-clip: padding-box;
 }
 
 .panel-foot {
@@ -159,9 +291,14 @@ body::before {
   border-bottom: none;
 }
 
-.group > summary {
+/* Trigger — a real button, so it is focusable and announces its state. */
+.group-trigger {
+  width: 100%;
+  appearance: none;
+  background: none;
+  border: 0;
   cursor: pointer;
-  list-style: none;
+  font: inherit;
   padding: 11px 16px;
   font-size: 11px;
   font-weight: 600;
@@ -171,29 +308,68 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   user-select: none;
+  transition: color 160ms ease;
 }
 
-.group > summary::-webkit-details-marker {
-  display: none;
-}
-
-.group > summary::after {
-  content: '+';
-  font-size: 14px;
-  color: var(--muted);
-}
-
-.group[open] > summary::after {
-  content: '\2212';
-}
-
-.group > summary:hover {
+.group-trigger:hover {
   color: var(--text);
+}
+
+.group-trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+  border-radius: 6px;
+  color: var(--text);
+}
+
+.chevron {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-right: 1.4px solid currentColor;
+  border-bottom: 1.4px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.group.is-open .chevron {
+  transform: rotate(45deg);
+}
+
+/*
+ * The drawer itself. Animating `grid-template-rows` from `0fr` to `1fr` slides
+ * from the content's own height, so there is nothing to measure and no fixed
+ * max-height to get wrong when a group gains a control.
+ */
+.group-shell {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.group.is-open .group-shell {
+  grid-template-rows: 1fr;
+}
+
+.group-clip {
+  overflow: hidden;
+  min-height: 0;
 }
 
 .group-body {
   padding: 2px 16px 14px;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition:
+    opacity 160ms ease,
+    transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.group.is-open .group-body {
+  opacity: 1;
+  transform: none;
 }
 
 .row {
@@ -311,6 +487,47 @@ body::before {
 
 .row input[type='checkbox']:checked::after {
   transform: translateX(15px);
+}
+
+/* A column of labelled chip rows. The rows are flex; this is not. */
+/* Colour drawer — only the rows the current mode uses. */
+.group[data-mode] .ramp-only,
+.group[data-mode] .shape-only {
+  display: none;
+}
+
+.group[data-mode='ramp'] .ramp-only {
+  display: grid;
+}
+
+.group[data-mode='shape'] .shape-only {
+  display: block;
+}
+
+.note {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.chip-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.chip-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.72;
+  margin: 2px 0 7px;
+}
+
+.chip-stack > .chips + .chip-label {
+  margin-top: 14px;
 }
 
 .chips {
@@ -454,5 +671,19 @@ button.ghost:hover {
 
   .hint {
     display: none;
+  }
+}
+
+/*
+ * Anyone who has asked for less motion gets none of the above. The drawer still
+ * opens and closes, it just does so instantly.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
   }
 }

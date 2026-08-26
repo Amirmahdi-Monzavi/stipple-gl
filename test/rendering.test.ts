@@ -54,7 +54,9 @@ describe('camera-aware culling', () => {
   // to drop those particles permanently, so zooming out revealed a hard horizontal
   // crop instead of the rest of the sphere.
   it('keeps particles the camera will pull back into view when zoomed out', () => {
-    const { backend, options } = boot({ count: 4000, minorCount: 0 });
+    // Pinned rather than inherited: the assertions below depend on the sphere
+    // overflowing the viewport, and that is a default which can legitimately move.
+    const { backend, options } = boot({ count: 4000, minorCount: 0, spread: { radius: 0.62 } });
     const state = frameState();
     backend.step(state, options);
 
@@ -69,7 +71,9 @@ describe('camera-aware culling', () => {
   });
 
   it('culls more aggressively when zoomed in', () => {
-    const { backend, options } = boot({ count: 4000, minorCount: 0 });
+    // Pinned rather than inherited: the assertions below depend on the sphere
+    // overflowing the viewport, and that is a default which can legitimately move.
+    const { backend, options } = boot({ count: 4000, minorCount: 0, spread: { radius: 0.62 } });
     const state = frameState();
     backend.step(state, options);
 
@@ -80,7 +84,9 @@ describe('camera-aware culling', () => {
   });
 
   it('follows the camera offset', () => {
-    const { backend, options } = boot({ count: 4000, minorCount: 0 });
+    // Pinned rather than inherited: the assertions below depend on the sphere
+    // overflowing the viewport, and that is a default which can legitimately move.
+    const { backend, options } = boot({ count: 4000, minorCount: 0, spread: { radius: 0.62 } });
     const state = frameState();
     backend.step(state, options);
 
@@ -132,7 +138,9 @@ describe('every preset puts something visible on screen', () => {
     const meanSize = sizeSum / count;
     const inked = (visible * Math.PI * (meanSize / 2) ** 2) / (viewport.width * viewport.height);
 
-    expect(visible, `${name} packs particles but none are above the alpha floor`).toBeGreaterThan(0);
+    expect(visible, `${name} packs particles but none are above the alpha floor`).toBeGreaterThan(
+      0,
+    );
     expect(inked, `${name} inks only ${(inked * 100).toFixed(3)}% of the canvas`).toBeGreaterThan(
       0.004,
     );

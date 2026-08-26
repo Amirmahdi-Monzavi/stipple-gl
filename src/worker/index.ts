@@ -153,9 +153,9 @@ export class WorkerStipple implements StippleInstance {
     return [
       ['pointermove', this.onPointerMove as EventListener],
       ['pointerdown', this.onPointerDown as EventListener],
-      ['pointerup', this.onPointerUp as EventListener],
-      ['pointercancel', this.onPointerLeave as EventListener],
-      ['pointerleave', this.onPointerLeave as EventListener],
+      ['pointerup', this.onPointerUp],
+      ['pointercancel', this.onPointerLeave],
+      ['pointerleave', this.onPointerLeave],
     ];
   }
 
@@ -315,7 +315,7 @@ export class WorkerStipple implements StippleInstance {
   }
 
   setOptions(config: StippleConfig): void {
-    this.opts = resolveOptions({ ...this.opts, ...config } as StippleConfig);
+    this.opts = resolveOptions({ ...this.opts, ...config });
     this.send({ type: 'options', config: sanitizeConfig(config) });
   }
 
@@ -343,7 +343,9 @@ export class WorkerStipple implements StippleInstance {
   }
 
   tick(): void {
-    this.opts.onError?.(fail('tick() is not available in worker mode; the worker drives its own loop'));
+    this.opts.onError?.(
+      fail('tick() is not available in worker mode; the worker drives its own loop'),
+    );
   }
 
   resize(): void {

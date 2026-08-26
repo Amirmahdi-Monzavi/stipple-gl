@@ -58,17 +58,17 @@ stipple.setMorph(1);
 
 ## What the parser handles
 
-| element | support |
-|---|---|
-| `<path>` | full — any `d` string `Path2D` accepts |
-| `<circle>`, `<ellipse>` | converted to arc paths |
-| `<rect>` | converted, including `rx`/`ry` rounded corners |
-| `<line>`, `<polyline>`, `<polygon>` | converted |
-| `<g>` | traversed, with transforms composed |
-| `transform` | `translate`, `scale`, `rotate` (with origin), `matrix`, `skewX`, `skewY` |
-| `fill-rule="evenodd"` | honoured, so holes stay holes |
-| stroke-only paths | `fill="none"` with a stroke and `stroke-width` samples the stroke |
-| `<defs>`, `<mask>`, `<clipPath>`, `<style>` | skipped |
+| element                                     | support                                                                  |
+| ------------------------------------------- | ------------------------------------------------------------------------ |
+| `<path>`                                    | full — any `d` string `Path2D` accepts                                   |
+| `<circle>`, `<ellipse>`                     | converted to arc paths                                                   |
+| `<rect>`                                    | converted, including `rx`/`ry` rounded corners                           |
+| `<line>`, `<polyline>`, `<polygon>`         | converted                                                                |
+| `<g>`                                       | traversed, with transforms composed                                      |
+| `transform`                                 | `translate`, `scale`, `rotate` (with origin), `matrix`, `skewX`, `skewY` |
+| `fill-rule="evenodd"`                       | honoured, so holes stay holes                                            |
+| stroke-only paths                           | `fill="none"` with a stroke and `stroke-width` samples the stroke        |
+| `<defs>`, `<mask>`, `<clipPath>`, `<style>` | skipped                                                                  |
 
 Not supported: `<use>` references, `<text>` (convert to outlines first), CSS-applied fills, gradients and patterns (only coverage matters — colour comes from options), and clipping.
 

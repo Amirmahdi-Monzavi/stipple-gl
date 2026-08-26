@@ -26,7 +26,8 @@ If it still complains, run `pnpm rebuild esbuild` once.
 Then:
 
 ```bash
-pnpm validate      # typecheck + tests + dead-option audit + build
+pnpm validate      # lint + format + typecheck + tests + dead-option audit + build
+pnpm visual        # Playwright screenshot tests against the playground
 pnpm playground    # interactive playground on http://localhost:5180
 ```
 
@@ -40,13 +41,13 @@ Requires Node 22+ and pnpm 11. Built on Windows with Node 24.16 and pnpm 11.5.2.
 
 Everything below is committed. `git log` has the detail — the commit messages are written to be worth reading.
 
-| commit | what |
-|---|---|
-| `711a6fd` | Extracted the engine from `web_app1` and `sinafrontend` into a package |
-| `09cb20b` | Fixed the black canvas (`desynchronized` + premultiplied alpha) |
-| `7e7811b` | Reworked sprite quality, sphere layout, morph transition |
-| `c2062c0` | Sweep transition, per-frame optimisations, lite entry, dead-prop audit |
-| `9807786` | Worker mode via OffscreenCanvas, DOM-free runtime |
+| commit        | what                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| `711a6fd`     | Extracted the engine from `web_app1` and `sinafrontend` into a package                            |
+| `09cb20b`     | Fixed the black canvas (`desynchronized` + premultiplied alpha)                                   |
+| `7e7811b`     | Reworked sprite quality, sphere layout, morph transition                                          |
+| `c2062c0`     | Sweep transition, per-frame optimisations, lite entry, dead-prop audit                            |
+| `9807786`     | Worker mode via OffscreenCanvas, DOM-free runtime                                                 |
 | _uncommitted_ | Full API redesign — see CHANGELOG "Unreleased". Twelve findings from the API review, all applied. |
 
 **Nothing is published.** No GitHub remote, nothing on npm. That was deliberate.
@@ -80,7 +81,7 @@ Three tests guard the split and will fail loudly if it is broken:
 
 - **Core is framework-agnostic; React is a thin binding.** The original was a React component. Inverting that was the point of the whole exercise.
 - **`SimulationBackend` exists so a GPU transform-feedback backend can land later.** v1 ships an optimised CPU backend deliberately, to ship rather than slip.
-- **The scroll module reads scroll position and composes with native CSS `scroll-snap`.** It deliberately does *not* port the 707-line GSAP scroll-hijacker from sinafrontend. Reasoning is in `docs/scroll.md`.
+- **The scroll module reads scroll position and composes with native CSS `scroll-snap`.** It deliberately does _not_ port the 707-line GSAP scroll-hijacker from sinafrontend. Reasoning is in `docs/scroll.md`.
 - **`easing` accepts a name as well as a function.** The name form is the only one that survives the worker boundary, because `postMessage` cannot clone functions.
 - **`spread.volume: 1` (volume-distributed sphere) is why there is no visible rim.** A shell distribution piles particles at the silhouette. Do not "simplify" this back to a shell.
 - **`assign: 'angular'`** is why morphs read as condensing rather than scrambling. There is a test asserting it reaches the optimal pairing for concentric rings.
@@ -95,24 +96,28 @@ Three tests guard the split and will fail loudly if it is broken:
 
 Re-measure before changing any of these in the README.
 
-| claim | how to reproduce |
-|---|---|
-| lite 12.50 KB / full 19.12 KB / react 18.94 KB gzipped | `node scripts/measure.mjs` (bundles with NODE_ENV=production, as a real consumer does) |
-| per-module bundle attribution | `node scripts/analyze.mjs stipple` |
-| 25,000 particles at ~8 ms CPU/frame | snippet at the end of `docs/performance.md` |
-| worker keeps 60 fps through a 900 ms main-thread block | `docs/worker.md` |
-| competitor sizes (tsparticles 52 KB, particles.js 8.8 KB) | measured on published bundles; **particles.js is smaller than us and the README says so** |
+| claim                                                            | how to reproduce                                                                                                                                                  |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| lite 12.4 KB / full 17.9 KB gzipped, as a real import costs      | `node scripts/measure.mjs` measures the whole barrel (19.6 KB); a consumer importing `{ Stipple, shapeFromURL }` ships 17.9 KB. Quote the import, not the barrel. |
+| npm package 119.9 KB packed / 439 KB unpacked                    | `npm pack --dry-run`. Sourcemaps are deliberately not built or shipped — they were 932 KB of a 1372 KB package.                                                   |
+| 25,000 particles at ~4.1 ms CPU/frame (1920x1080, full pipeline) | benchmark `backend.step` + `backend.pack` directly; morph ~1.5ms, jelly ~0.76ms, breathe ~0.63ms                                                                  |
+| per-module bundle attribution                                    | `node scripts/analyze.mjs stipple`                                                                                                                                |
+| 25,000 particles at ~8 ms CPU/frame                              | snippet at the end of `docs/performance.md`                                                                                                                       |
+| worker keeps 60 fps through a 900 ms main-thread block           | `docs/worker.md`                                                                                                                                                  |
+| competitor sizes (tsparticles 52 KB, particles.js 8.8 KB)        | measured on published bundles; **particles.js is smaller than us and the README says so**                                                                         |
 
 ---
 
 ## Debugging tricks worth remembering
 
-**Reading pixels back off the GPU.** Do it inside a *nested* `requestAnimationFrame`, never `setTimeout`. With `preserveDrawingBuffer: false` the buffer is gone after compositing, and a `setTimeout` read returns all zeros — which looks exactly like a rendering bug and is not one. This cost time once already.
+**Reading pixels back off the GPU.** Do it inside a _nested_ `requestAnimationFrame`, never `setTimeout`. With `preserveDrawingBuffer: false` the buffer is gone after compositing, and a `setTimeout` read returns all zeros — which looks exactly like a rendering bug and is not one. This cost time once already.
 
 ```js
-requestAnimationFrame(() => requestAnimationFrame(() => {
-  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
-}));
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => {
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  }),
+);
 ```
 
 **Pixels present but screen black** means a compositing problem, not a simulation one. Check context attributes and stacking, not the particle code. See the troubleshooting section in `docs/getting-started.md`.
@@ -128,6 +133,8 @@ requestAnimationFrame(() => requestAnimationFrame(() => {
 - **Playground deployment.** `pnpm playground:build` outputs to `dist-playground/`. Not deployed anywhere yet.
 - **React worker component.** `stipple-gl/worker` is imperative only; `docs/worker.md` shows the `useEffect` pattern. A `<WorkerParticles>` component would be a small, obvious addition.
 - **Linked lines were deliberately skipped.** It is tsparticles' signature feature, it is CPU-expensive everywhere it exists, and chasing it fights on their ground. Shape morphing is the differentiator.
+- **Visual tests need a browser.** `pnpm visual` uses the Chrome already installed locally; CI installs Playwright's own pinned Chromium, because screenshot comparison is only meaningful against a fixed build. Regenerate baselines with `pnpm visual:update` and _look at the diff_ before accepting it.
+- **The visual harness has to freeze three things** to be deterministic: a seeded `Math.random`, a frozen `performance.now`, and `requestAnimationFrame` neutralised in an init script. Stopping the loop after load is not enough — `drift` rolls the generator once per ambient particle per frame, so stray real frames shift every particle.
 - **The playground's worker toggle is dev-only.** It constructs the worker from `../../src/worker/thread.ts` so Vite can resolve the TS source. The published path uses `new URL('./thread.js', import.meta.url)`.
 
 ## Candidate next features, roughly in order of value

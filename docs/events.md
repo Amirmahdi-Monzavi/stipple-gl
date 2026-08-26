@@ -15,7 +15,7 @@ Sets the shape and morphs into it. The promise resolves when the field arrives.
 
 ```ts
 await stipple.morphTo(logoA);
-await stipple.morphTo(logoB);              // swaps between shapes
+await stipple.morphTo(logoB); // swaps between shapes
 await stipple.morphTo(logoC, { swap: 'burst' });
 await stipple.morphTo(logoD, { enter: { speed: 0.04 } });
 ```
@@ -38,7 +38,7 @@ stipple.on('morphend', ({ shape, cancelled }) => {
 
 ## `release()`
 
-Returns the field to the dispersed sphere, animated with `transition.exit`. The shape is kept, so the return trip has something to travel *from* — this is why `release()` exists rather than `setShape(null)`.
+Returns the field to the dispersed sphere, animated with `transition.exit`. The shape is kept, so the return trip has something to travel _from_ — this is why `release()` exists rather than `setShape(null)`.
 
 `setShape(null)` still works and still clears immediately. Use it when you want the shape gone, not returned from.
 
@@ -46,12 +46,12 @@ Returns the field to the dispersed sphere, animated with `transition.exit`. The 
 
 ## Events
 
-| event | payload | fires |
-|---|---|---|
-| `morphstart` | `{ from, to, shape }` | a morph begins moving |
-| `morphprogress` | `{ value }` | every frame the morph value changes |
-| `morphend` | `{ shape, cancelled }` | the morph reaches its target, or is superseded |
-| `shapechange` | `{ shape }` | a shape is set or cleared |
+| event           | payload                | fires                                          |
+| --------------- | ---------------------- | ---------------------------------------------- |
+| `morphstart`    | `{ from, to, shape }`  | a morph begins moving                          |
+| `morphprogress` | `{ value }`            | every frame the morph value changes            |
+| `morphend`      | `{ shape, cancelled }` | the morph reaches its target, or is superseded |
+| `shapechange`   | `{ shape }`            | a shape is set or cleared                      |
 
 `on` returns an unsubscribe function:
 

@@ -152,9 +152,9 @@ export class StippleCore implements StippleInstance {
     return [
       ['pointermove', this.onPointerMove as EventListener],
       ['pointerdown', this.onPointerDown as EventListener],
-      ['pointerup', this.onPointerUp as EventListener],
-      ['pointercancel', this.onPointerLeave as EventListener],
-      ['pointerleave', this.onPointerLeave as EventListener],
+      ['pointerup', this.onPointerUp],
+      ['pointercancel', this.onPointerLeave],
+      ['pointerleave', this.onPointerLeave],
     ];
   }
 

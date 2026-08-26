@@ -78,10 +78,10 @@ describe('noise2', () => {
   it('uses no trigonometry in its hash', () => {
     const original = Math.sin;
     let calls = 0;
-    Math.sin = ((value: number) => {
+    Math.sin = (value: number) => {
       calls++;
       return original(value);
-    }) as typeof Math.sin;
+    };
     try {
       for (let i = 0; i < 100; i++) noise2(i * 0.3, i * 0.7);
     } finally {

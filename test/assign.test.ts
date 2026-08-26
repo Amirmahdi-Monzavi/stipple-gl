@@ -169,7 +169,9 @@ describe('mergeOptions', () => {
     const easing = (t: number) => t;
     const merged = resolveOptions({ transition: { enter: { easing } } });
     expect((merged.transition.enter as { easing: unknown }).easing).toBe(easing);
-    expect(resolveChoreography(merged.transition.enter).speed).toBe(resolveChoreography(defaultOptions.transition.enter).speed);
+    expect(resolveChoreography(merged.transition.enter).speed).toBe(
+      resolveChoreography(defaultOptions.transition.enter).speed,
+    );
   });
 
   it('ignores undefined but honours explicit null', () => {

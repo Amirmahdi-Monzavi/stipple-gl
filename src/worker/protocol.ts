@@ -83,5 +83,5 @@ export const sanitizeChoreography = (
     if (typeof value === 'function') continue;
     out[key] = value;
   }
-  return out as ChoreographyConfig;
+  return out;
 };

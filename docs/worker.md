@@ -1,6 +1,6 @@
 # Worker mode
 
-Run the entire particle system — simulation *and* rendering — on a Web Worker, so it costs the main thread nothing.
+Run the entire particle system — simulation _and_ rendering — on a Web Worker, so it costs the main thread nothing.
 
 ```ts
 import { createWorkerStipple } from 'stipple-gl/worker';
@@ -17,10 +17,10 @@ The canvas is handed to the worker with `transferControlToOffscreen()`. From the
 
 The difference shows up when your page is busy. Blocking the main thread for 900 ms and measuring how far a transition progressed:
 
-| | main thread | worker |
-|---|---|---|
-| morph advanced during the block | 0.144 | **0.372** |
-| frames rendered during the block | none | 60 fps throughout |
+|                                  | main thread | worker            |
+| -------------------------------- | ----------- | ----------------- |
+| morph advanced during the block  | 0.144       | **0.372**         |
+| frames rendered during the block | none        | 60 fps throughout |
 
 The main thread's 0.144 is the single catch-up step after the block ends, not animation during it. In worker mode the field never stopped moving.
 
@@ -30,12 +30,12 @@ That matters for a hydrating framework app, a heavy table render, a large JSON p
 
 **Options containing functions cannot cross the boundary.** `postMessage` uses structured clone, which cannot serialise functions. Four options are affected:
 
-| option | in worker mode |
-|---|---|
-| `transition.easing` | use a **name**: `'linear'`, `'inOutCubic'`, `'inOutQuad'`, `'outExpo'`, `'outBack'`, `'inOutElastic'` |
-| `behaviors` | not transferable; the worker builds the default pipeline |
-| `backend` | not transferable; the worker uses `CpuBackend` |
-| `onReady` / `onError` | stay on the main thread and still fire |
+| option                | in worker mode                                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| `transition.easing`   | use a **name**: `'linear'`, `'inOutCubic'`, `'inOutQuad'`, `'outExpo'`, `'outBack'`, `'inOutElastic'` |
+| `behaviors`           | not transferable; the worker builds the default pipeline                                              |
+| `backend`             | not transferable; the worker uses `CpuBackend`                                                        |
+| `onReady` / `onError` | stay on the main thread and still fire                                                                |
 
 Anything non-serialisable is dropped rather than throwing. Pass `onDroppedOptions` to see what went:
 
@@ -52,7 +52,7 @@ Named easings work in both modes, so `easing: 'outExpo'` is the portable choice 
 
 **`tick()` is unavailable.** The worker drives its own loop.
 
-**SVG parsing stays on the main thread.** `DOMParser` does not exist in workers, so `shapeFromURL` and `shapeFromString` run where you call them and the parsed geometry is sent across. That geometry is plain data and clones cleanly. Sampling and target assignment happen *in* the worker, using `OffscreenCanvas` and `Path2D`.
+**SVG parsing stays on the main thread.** `DOMParser` does not exist in workers, so `shapeFromURL` and `shapeFromString` run where you call them and the parsed geometry is sent across. That geometry is plain data and clones cleanly. Sampling and target assignment happen _in_ the worker, using `OffscreenCanvas` and `Path2D`.
 
 ## Bundling
 

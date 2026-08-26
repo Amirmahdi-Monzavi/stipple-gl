@@ -3,11 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>stipple-gl playground</title>
+    <title>stipple-gl — particle morphing playground</title>
     <meta
       name="description"
-      content="Interactive playground for stipple-gl, a WebGL2 particle field that morphs into any SVG."
+      content="Interactive playground for stipple-gl, a WebGL2 particle field that morphs into any SVG or image."
     />
+    <meta name="theme-color" content="#05070a" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
@@ -16,16 +18,42 @@
     <header class="masthead">
       <div class="wordmark">
         <span class="dot"></span>
-        stipple<span class="muted">-gl</span>
+        <!--
+          One span, not a bare text node: `.wordmark` is a flex container, and a
+          loose text node becomes its own anonymous flex item, which puts the
+          container's gap between "stipple" and "-gl".
+        -->
+        <span class="wordmark-name">stipple<span class="muted">-gl</span></span>
       </div>
-      <div class="stat" id="stat"></div>
+
+      <div class="masthead-right">
+        <div class="stat" id="stat"></div>
+        <button
+          class="panel-toggle"
+          id="panel-toggle"
+          type="button"
+          aria-controls="panel"
+          aria-expanded="true"
+        >
+          <span class="panel-toggle-bars" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span id="panel-toggle-label">Hide panel</span>
+        </button>
+      </div>
     </header>
 
     <aside class="panel" id="panel">
       <div class="panel-head">
         <h1>Playground</h1>
-        <button class="ghost" id="toggle-panel" type="button" aria-label="Collapse panel">
-          &minus;
+        <button class="ghost icon" id="toggle-panel" type="button" aria-label="Hide panel">
+          <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true">
+            <path
+              d="M4 4l8 8M12 4l-8 8"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+          </svg>
         </button>
       </div>
       <div class="panel-body" id="panel-body"></div>
@@ -39,6 +67,8 @@
       <span>Drop an SVG, PNG, JPEG or WebP anywhere to morph into it</span>
       <span class="sep">·</span>
       <span>Click the shape to send a shockwave</span>
+      <span class="sep">·</span>
+      <span><kbd>P</kbd> toggles the panel</span>
     </footer>
 
     <div class="drop-veil" id="drop-veil"><span>Release to morph</span></div>

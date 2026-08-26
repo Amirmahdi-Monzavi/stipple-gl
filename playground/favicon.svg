@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!--
+    A particle field condensing on a centre — the thing the library does, at a
+    size where only the silhouette survives. Eight satellites and a bright core
+    stay legible down to 16px; anything finer turns to mush.
+  -->
+  <circle cx="16" cy="16" r="4.6" fill="#5ec8f2" />
+  <g fill="#5ec8f2">
+    <circle cx="16" cy="4.2" r="2.5" opacity=".95" />
+    <circle cx="24.3" cy="7.7" r="2.2" opacity=".8" />
+    <circle cx="27.8" cy="16" r="2.5" opacity=".95" />
+    <circle cx="24.3" cy="24.3" r="2.2" opacity=".8" />
+    <circle cx="16" cy="27.8" r="2.5" opacity=".95" />
+    <circle cx="7.7" cy="24.3" r="2.2" opacity=".8" />
+    <circle cx="4.2" cy="16" r="2.5" opacity=".95" />
+    <circle cx="7.7" cy="7.7" r="2.2" opacity=".8" />
+  </g>
+</svg>

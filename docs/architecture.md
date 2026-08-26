@@ -30,11 +30,11 @@ The alternative — rebuilding an array of particle objects every frame and allo
 
 Each particle is **16 bytes**:
 
-| offset | bytes | attribute | type |
-|---|---|---|---|
-| 0 | 8 | position (x, y) normalised to 0…1 | `vec2` float |
-| 8 | 4 | point size in device pixels | `float` |
-| 12 | 4 | colour + alpha | `ubyte4` normalised |
+| offset | bytes | attribute                         | type                |
+| ------ | ----- | --------------------------------- | ------------------- |
+| 0      | 8     | position (x, y) normalised to 0…1 | `vec2` float        |
+| 8      | 4     | point size in device pixels       | `float`             |
+| 12     | 4     | colour + alpha                    | `ubyte4` normalised |
 
 Packing RGBA into a single 32-bit word instead of three floats plus an alpha float cuts the stride from 28 bytes to 16 — a 43% reduction in upload bandwidth every frame. The engine keeps a `Float32Array` and a `Uint32Array` as two views over the same `ArrayBuffer`, so both writes land in the same memory with no conversion step.
 
@@ -58,16 +58,16 @@ The critical design choice is that behaviours operate on **whole arrays**, not o
 
 The default order:
 
-| order | behaviour | writes |
-|---|---|---|
-| 10 | `morph` | target position from spread ↔ shape, flow noise into velocity |
-| 15 | `breathe` | per-particle glow |
-| 20 | `jelly` | wobble offset onto the target |
-| 30 | `pointer` | repulsion onto the target |
-| 40 | `shockwave` | ring displacement onto the target |
-| 50 | `integrate` | moves actual position toward the target |
-| 60 | `drift` | ambient layer |
-| 70 | `emission` | spark spawn, update, and retire |
+| order | behaviour   | writes                                                        |
+| ----- | ----------- | ------------------------------------------------------------- |
+| 10    | `morph`     | target position from spread ↔ shape, flow noise into velocity |
+| 15    | `breathe`   | per-particle glow                                             |
+| 20    | `jelly`     | wobble offset onto the target                                 |
+| 30    | `pointer`   | repulsion onto the target                                     |
+| 40    | `shockwave` | ring displacement onto the target                             |
+| 50    | `integrate` | moves actual position toward the target                       |
+| 60    | `drift`     | ambient layer                                                 |
+| 70    | `emission`  | spark spawn, update, and retire                               |
 
 Everything from 10 to 40 accumulates into a scratch target (`tx`, `ty`, `tz`). Only `integrate` touches real positions. Adding a force means writing to the target and inserting your behaviour before order 50.
 
@@ -94,7 +94,7 @@ Systematic sampling with jitter also beats collect-everything-then-shuffle: it i
 
 Two details decide whether the dispersed field reads as a cloud or as a flat blob with a hard edge.
 
-**Volume, not shell.** Placing particles on a sphere's *surface* and projecting to 2D piles them up at the silhouette, because the projected density diverges where the surface turns edge-on. The result is a solid disc with a bright rim. Distributing through the *volume* instead — radius scaled by the cube root of a uniform value — gives a projected density that peaks at the centre and falls smoothly to zero, with no boundary at all. `spread.volume` interpolates between the two.
+**Volume, not shell.** Placing particles on a sphere's _surface_ and projecting to 2D piles them up at the silhouette, because the projected density diverges where the surface turns edge-on. The result is a solid disc with a bright rim. Distributing through the _volume_ instead — radius scaled by the cube root of a uniform value — gives a projected density that peaks at the centre and falls smoothly to zero, with no boundary at all. `spread.volume` interpolates between the two.
 
 **A sphere, not an ellipse.** Scaling the layout by canvas width and height independently turns the sphere into an ellipse that stretches with the viewport. The radius is a single value derived from the canvas diagonal, so the field stays round at any aspect ratio.
 
@@ -102,11 +102,11 @@ The sphere also rotates. Particle positions are stored in local coordinates cent
 
 ## Target assignment
 
-Sampling gives you a bag of points. Deciding *which particle goes to which point* determines whether a morph reads as elegant or as noise.
+Sampling gives you a bag of points. Deciding _which particle goes to which point_ determines whether a morph reads as elegant or as noise.
 
 Assign randomly and the average particle crosses most of the canvas, paths cross constantly, and the transition looks like static resolving. The usual fix is to paper over it with a swirl or a blur.
 
-`assign: 'angular'` sorts the dispersed particles by their angle around the field centroid, sorts the sampled points by their angle around the shape centroid, and pairs the two sorted orders. Particles keep their rough angular position through the transition, so the shape appears to *condense* rather than reshuffle. Total travel distance drops sharply — for two concentric rings it reaches the optimal assignment exactly, and it costs one O(n log n) sort per shape change rather than anything per frame.
+`assign: 'angular'` sorts the dispersed particles by their angle around the field centroid, sorts the sampled points by their angle around the shape centroid, and pairs the two sorted orders. Particles keep their rough angular position through the transition, so the shape appears to _condense_ rather than reshuffle. Total travel distance drops sharply — for two concentric rings it reaches the optimal assignment exactly, and it costs one O(n log n) sort per shape change rather than anything per frame.
 
 A true optimal transport solution would be better still for pathological cases, and far too slow to be worth it.
 
@@ -160,17 +160,17 @@ WorkerStipple  the same browser half, forwarding messages instead of calling dir
 
 The split of labour in worker mode:
 
-| main thread | worker |
-|---|---|
-| resize, pointer, visibility observation | simulation, packing, all GL |
+| main thread                                        | worker                                   |
+| -------------------------------------------------- | ---------------------------------------- |
+| resize, pointer, visibility observation            | simulation, packing, all GL              |
 | SVG parsing (`DOMParser` has no worker equivalent) | rasterising, sampling, target assignment |
-| forwarding messages | the frame loop |
+| forwarding messages                                | the frame loop                           |
 
 Parsed SVG geometry is plain data — path strings, a fill rule, a stroke width, a six-number matrix — so it clones across the boundary without special handling. Functions do not, which is why `transition.easing` also accepts a name.
 
 ## Why the CPU backend, for now
 
-The rendering is genuinely GPU work. The simulation is not — it is JavaScript on the main thread, and the honest description of this release is *GPU-rendered, CPU-simulated*.
+The rendering is genuinely GPU work. The simulation is not — it is JavaScript on the main thread, and the honest description of this release is _GPU-rendered, CPU-simulated_.
 
 The obvious next step is a transform-feedback backend: keep positions and velocities in ping-pong vertex buffers, run integration in a vertex shader, and never touch particle data from JavaScript. That lifts the ceiling from tens of thousands of particles to hundreds of thousands.
 
@@ -184,13 +184,13 @@ So the `SimulationBackend` interface exists now, the CPU implementation is optim
 
 `Behavior` entries run in phase order. Declare a `phase` rather than guessing a number:
 
-| phase | runs | what belongs here |
-|---|---|---|
-| `target` | first | decides where each particle is trying to be (`morph`) |
-| `deform` | | warps those targets (`breathe`, `jelly`) |
-| `force` | | pushes particles around (`pointer`, `shockwave`) — the default |
-| `integrate` | | turns velocity into position (`integrate`) |
-| `ambient` | last | independent of the major field (`drift`, `emission`) |
+| phase       | runs  | what belongs here                                              |
+| ----------- | ----- | -------------------------------------------------------------- |
+| `target`    | first | decides where each particle is trying to be (`morph`)          |
+| `deform`    |       | warps those targets (`breathe`, `jelly`)                       |
+| `force`     |       | pushes particles around (`pointer`, `shockwave`) — the default |
+| `integrate` |       | turns velocity into position (`integrate`)                     |
+| `ambient`   | last  | independent of the major field (`drift`, `emission`)           |
 
 Anything after `integrate` writes positions directly and will not be damped, which is usually not what you want — that is the one ordering rule worth remembering.
 
@@ -200,9 +200,13 @@ import { createDefaultBehaviors } from 'stipple-gl';
 new Stipple('#hero', {
   behaviors: [
     ...createDefaultBehaviors(),
-    { name: 'gravity', phase: 'force', step: ({ major }) => {
-      for (let i = 0; i < major.count; i++) major.vy[i] += 0.02;
-    } },
+    {
+      name: 'gravity',
+      phase: 'force',
+      step: ({ major }) => {
+        for (let i = 0; i < major.count; i++) major.vy[i] += 0.02;
+      },
+    },
   ],
 });
 ```

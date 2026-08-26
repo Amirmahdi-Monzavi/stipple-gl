@@ -1,3 +1,5 @@
+import { createDrawer } from './drawer';
+
 export interface SliderSpec {
   kind: 'slider';
   path: string;
@@ -76,14 +78,8 @@ export const buildPanel = (
   const syncers: Array<(source: unknown) => void> = [];
 
   for (const group of groups) {
-    const details = el('details', 'group');
-    details.open = group.open ?? false;
-
-    const summary = el('summary');
-    summary.textContent = group.name;
-    details.appendChild(summary);
-
-    const body = el('div', 'group-body');
+    const drawer = createDrawer(group.name, group.open ?? false);
+    const body = drawer.body;
 
     for (const spec of group.controls) {
       const row = el('div', 'row');
@@ -142,7 +138,8 @@ export const buildPanel = (
 
         const apply = (source: unknown) => {
           const current = readPath(source, spec.path);
-          input.value = typeof current === 'string' && current.startsWith('#') ? current : '#4f9c7d';
+          input.value =
+            typeof current === 'string' && current.startsWith('#') ? current : '#4f9c7d';
         };
 
         input.addEventListener('input', () => {
@@ -180,8 +177,7 @@ export const buildPanel = (
       body.appendChild(row);
     }
 
-    details.appendChild(body);
-    container.appendChild(details);
+    container.appendChild(drawer.root);
   }
 
   return {
@@ -195,13 +191,62 @@ export const buildPanel = (
 export const choreographyControls = (slot: 'enter' | 'exit' | 'swap'): ControlSpec[] => {
   const at = (key: string) => 'transition.' + slot + '.' + key;
   return [
-    { kind: 'slider', path: at('speed'), label: 'Speed', min: 0.002, max: 0.12, step: 0.002, format: (v) => v.toFixed(3) },
-    { kind: 'select', path: at('easing'), label: 'Easing', choices: ['linear', 'inOutCubic', 'inOutQuad', 'outExpo', 'outBack', 'inOutElastic'] },
-    { kind: 'select', path: at('order'), label: 'Wavefront direction', choices: ['x', 'y', 'radial', 'radar', 'random'] },
-    { kind: 'slider', path: at('stagger'), label: 'Wavefront spread', min: 0, max: 0.9, step: 0.02, format: (v) => v.toFixed(2) },
-    { kind: 'slider', path: at('turbulence'), label: 'Flight turbulence', min: 0, max: 80, step: 1 },
-    { kind: 'slider', path: at('flash'), label: 'Wavefront flash', min: 0, max: 1, step: 0.05, format: (v) => v.toFixed(2) },
-    { kind: 'slider', path: at('flashWidth'), label: 'Flash width', min: 0.02, max: 0.6, step: 0.02, format: (v) => v.toFixed(2) },
+    {
+      kind: 'slider',
+      path: at('speed'),
+      label: 'Speed',
+      min: 0.002,
+      max: 0.12,
+      step: 0.002,
+      format: (v) => v.toFixed(3),
+    },
+    {
+      kind: 'select',
+      path: at('easing'),
+      label: 'Easing',
+      choices: ['linear', 'inOutCubic', 'inOutQuad', 'outExpo', 'outBack', 'inOutElastic'],
+    },
+    {
+      kind: 'select',
+      path: at('order'),
+      label: 'Wavefront direction',
+      choices: ['x', 'y', 'radial', 'radar', 'random'],
+    },
+    {
+      kind: 'slider',
+      path: at('stagger'),
+      label: 'Wavefront spread',
+      min: 0,
+      max: 0.9,
+      step: 0.02,
+      format: (v) => v.toFixed(2),
+    },
+    {
+      kind: 'slider',
+      path: at('turbulence'),
+      label: 'Flight turbulence',
+      min: 0,
+      max: 80,
+      step: 1,
+    },
+    {
+      kind: 'slider',
+      path: at('flash'),
+      label: 'Wavefront flash',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      format: (v) => v.toFixed(2),
+    },
+    {
+      kind: 'slider',
+      path: at('flashWidth'),
+      label: 'Flash width',
+      min: 0.02,
+      max: 0.6,
+      step: 0.02,
+      format: (v) => v.toFixed(2),
+    },
   ];
 };
 

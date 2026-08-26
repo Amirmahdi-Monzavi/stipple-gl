@@ -2,7 +2,7 @@
 
 A WebGL2 particle field that morphs into any SVG.
 
-Zero dependencies. Framework agnostic. **9.8 KB gzipped** for a particle background, 14.8 KB with SVG morphing and every behaviour.
+Zero dependencies. Framework agnostic. **12.4 KB gzipped** for a particle background, 17.9 KB with SVG morphing, raster image sources and every behaviour.
 
 Optionally runs the whole simulation on a **Web Worker**, so it costs the main thread nothing.
 
@@ -28,19 +28,20 @@ Most particle libraries give you drifting dots. This one gives you a **field wit
 
 It renders in a **single draw call** with no scene graph, no three.js, and no runtime dependencies.
 
-| | stipple-gl | tsparticles | particles.js |
-|---|---|---|---|
-| gzipped | **9.8 KB** lite · 14.8 KB full | 22 KB core · 52 KB full | 8.8 KB |
-| dependencies | **0** | 14 direct (52 packages) | 0 |
-| renderer | **WebGL2** | canvas 2D | canvas 2D |
-| off-main-thread | **yes, OffscreenCanvas** | no | no |
-| SVG morphing | **built in** | no | no |
-| written in | **TypeScript** | TypeScript | JavaScript |
-| status | active | active | unmaintained |
+|                      | stipple-gl                       | tsparticles             | particles.js |
+| -------------------- | -------------------------------- | ----------------------- | ------------ |
+| gzipped              | **12.4 KB** lite · 17.9 KB full  | 22 KB core · 52 KB full | 8.8 KB       |
+| dependencies         | **0**                            | 14 direct (52 packages) | 0            |
+| renderer             | **WebGL2**                       | canvas 2D               | canvas 2D    |
+| off-main-thread      | **yes, OffscreenCanvas**         | no                      | no           |
+| SVG morphing         | **built in**                     | no                      | no           |
+| raster image sources | **PNG, JPEG, WebP, AVIF, video** | no                      | no           |
+| written in           | **TypeScript**                   | TypeScript              | JavaScript   |
+| status               | active                           | active                  | unmaintained |
 
 <sub>Measured with gzip on the published bundles: `tsparticles@4.3.2` (`tsparticles.bundle.min.js` and `@tsparticles/engine`), and `particles.js@2.0.0` (ships unminified). Reproduce with `node scripts/measure.mjs`.</sub>
 
-To be straight about it: **particles.js is smaller.** It is also canvas 2D, unmaintained since 2016, and cannot morph. stipple-gl is not trying to be the smallest particle library — it is trying to be the smallest one that renders on the GPU *and* morphs into arbitrary SVG geometry. If all you need is drifting dots and every kilobyte counts, the older libraries are a reasonable answer.
+To be straight about it: **particles.js is smaller.** It is also canvas 2D, unmaintained since 2016, and cannot morph. stipple-gl is not trying to be the smallest particle library — it is trying to be the smallest one that renders on the GPU _and_ morphs into arbitrary SVG geometry. If all you need is drifting dots and every kilobyte counts, the older libraries are a reasonable answer.
 
 ---
 
@@ -65,7 +66,7 @@ import { Stipple, shapeFromString } from 'stipple-gl';
 
 const stipple = new Stipple(document.body, {
   count: 4000,
-  color: '#4f9c7d',
+  color: '#5ec8f2',
   mode: 'background',
 });
 
@@ -149,11 +150,13 @@ Particles disperse as a section leaves the viewport and reassemble into the next
 
 ## Three ways to import
 
-| entry | gzipped | what you get |
-|---|---|---|
-| `stipple-gl/lite` | **12.5 KB** | The engine and the ambient layer. No SVG parser, no morph sampling, no emission, pointer or shockwave behaviours. For a particle background. |
-| `stipple-gl` | **19.1 KB** | Everything: SVG parsing and sampling, raster image sources, angular assignment, all behaviours. |
-| `stipple-gl/worker` | +2 KB | The main-thread proxy. The engine itself ships in the worker chunk. |
+| entry               | gzipped     | what you get                                                                                                                                 |
+| ------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stipple-gl/lite`   | **12.4 KB** | The engine and the ambient layer. No SVG parser, no morph sampling, no emission, pointer or shockwave behaviours. For a particle background. |
+| `stipple-gl`        | **17.9 KB** | Everything: SVG parsing and sampling, raster image sources, angular assignment, all behaviours.                                              |
+| `stipple-gl/worker` | +2 KB       | The main-thread proxy. The engine itself ships in the worker chunk.                                                                          |
+
+Those are what a real import costs, measured on a production bundle — `stipple-gl` is `import { Stipple, shapeFromURL }`. Take only `Stipple` and it is 16.0 KB. Importing the whole barrel is 19.6 KB, which nobody does.
 
 `stipple-gl/react`, `stipple-gl/scroll` and `stipple-gl/presets` are separate entries too, so you only pay for what you import.
 
@@ -188,8 +191,8 @@ No bundler, no install — the script-tag build puts everything on `window.stipp
 <div id="hero" style="height:100vh"></div>
 <script src="https://unpkg.com/stipple-gl"></script>
 <script>
-  const s = stipple.createStipple("#hero");
-  s.morphTo(stipple.shapeFromString(document.querySelector("#logo").outerHTML));
+  const s = stipple.createStipple('#hero');
+  s.morphTo(stipple.shapeFromString(document.querySelector('#logo').outerHTML));
 </script>
 ```
 
@@ -200,20 +203,20 @@ No bundler, no install — the script-tag build puts everything on `window.stipp
 A move between states is a **choreography**, and there are three places one can run:
 
 ```ts
-new Stipple("#hero", {
+new Stipple('#hero', {
   transition: {
-    enter: "sweep",   // spread → shape
-    exit: "mirror",   // shape → spread (reuses enter, gentler)
-    swap: "burst",    // shape → shape
+    enter: 'condense', // spread → shape
+    exit: 'mirror', // shape → spread (reuses enter, gentler)
+    swap: 'burst', // shape → shape
   },
 });
 ```
 
-`uniform`, `sweep` and `burst` are shorthand for full objects you can also write out:
+`condense` (the default), `uniform`, `sweep` and `burst` are shorthand for full objects you can also write out:
 
 ```ts
 transition: {
-  enter: { speed: 0.014, easing: "inOutCubic", stagger: 0.82, order: "x", turbulence: 16 },
+  enter: { speed: 0.05, easing: "outExpo", stagger: 0.68, order: "radial", turbulence: 14 },
 }
 ```
 
@@ -239,23 +242,23 @@ Each is a plain config object — spread it and override whatever you want.
 
 `target` is an element, a CSS selector, or an existing `<canvas>`. If you pass a canvas, stipple-gl renders into it and leaves its styling alone.
 
-| method | description |
-|---|---|
-| `morphTo(shape, options?)` | Set a shape and morph into it. Returns a promise that resolves on arrival, or immediately if a later call supersedes it. |
-| `release()` | Return to the spread, animated. Returns the same kind of promise. |
-| `setMorph(0…1)` | Move toward dispersed (0) or shaped (1). Returns a promise for arrival. |
-| `getMorph()` | Current interpolated value. |
-| `setShape(shape | null, choreography?)` | Swap the target without touching the morph value. Returns `false` if the field has no major particles. |
-| `on(event, handler)` | Subscribe to `morphstart`, `morphprogress`, `morphend` or `shapechange`. Returns an unsubscribe function. |
-| `off(event, handler)` | Unsubscribe. |
-| `setOptions(config)` | Deep-merge new options at runtime. |
-| `resetOptions(config?)` | Drop every runtime tweak and rebuild from the defaults. |
-| `setCount(count, minorCount?)` | Resize the particle pools. |
-| `pulse(x, y, strength?)` | Fire a shockwave ring from a point. |
-| `tick(dt?)` | Advance one frame manually, for driving your own loop. |
-| `start()` / `stop()` | Control the internal loop. |
-| `resize()` | Force a re-measure. |
-| `destroy()` | Full teardown — listeners, GL objects, canvas. |
+| method                         | description                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `morphTo(shape, options?)`     | Set a shape and morph into it. Returns a promise that resolves on arrival, or immediately if a later call supersedes it. |
+| `release()`                    | Return to the spread, animated. Returns the same kind of promise.                                                        |
+| `setMorph(0…1)`                | Move toward dispersed (0) or shaped (1). Returns a promise for arrival.                                                  |
+| `getMorph()`                   | Current interpolated value.                                                                                              |
+| `setShape(shape                | null, choreography?)`                                                                                                    | Swap the target without touching the morph value. Returns `false` if the field has no major particles. |
+| `on(event, handler)`           | Subscribe to `morphstart`, `morphprogress`, `morphend` or `shapechange`. Returns an unsubscribe function.                |
+| `off(event, handler)`          | Unsubscribe.                                                                                                             |
+| `setOptions(config)`           | Deep-merge new options at runtime.                                                                                       |
+| `resetOptions(config?)`        | Drop every runtime tweak and rebuild from the defaults.                                                                  |
+| `setCount(count, minorCount?)` | Resize the particle pools.                                                                                               |
+| `pulse(x, y, strength?)`       | Fire a shockwave ring from a point.                                                                                      |
+| `tick(dt?)`                    | Advance one frame manually, for driving your own loop.                                                                   |
+| `start()` / `stop()`           | Control the internal loop.                                                                                               |
+| `resize()`                     | Force a re-measure.                                                                                                      |
+| `destroy()`                    | Full teardown — listeners, GL objects, canvas.                                                                           |
 
 Read-only: `canvas`, `options`, `running`, `fps`.
 

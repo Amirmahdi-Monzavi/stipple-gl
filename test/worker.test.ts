@@ -93,6 +93,8 @@ describe('resolveEasing', () => {
 
   it('accepts a named easing through the options pipeline', () => {
     const options = resolveOptions({ transition: { enter: { easing: 'outExpo' } } });
-    expect(resolveEasing(resolveChoreography(options.transition.enter).easing)).toBe(easings.outExpo);
+    expect(resolveEasing(resolveChoreography(options.transition.enter).easing)).toBe(
+      easings.outExpo,
+    );
   });
 });
