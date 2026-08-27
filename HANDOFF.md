@@ -41,16 +41,26 @@ Requires Node 22+ and pnpm 11. Built on Windows with Node 24.16 and pnpm 11.5.2.
 
 Everything below is committed. `git log` has the detail — the commit messages are written to be worth reading.
 
-| commit        | what                                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| `711a6fd`     | Extracted the engine from `web_app1` and `sinafrontend` into a package                            |
-| `09cb20b`     | Fixed the black canvas (`desynchronized` + premultiplied alpha)                                   |
-| `7e7811b`     | Reworked sprite quality, sphere layout, morph transition                                          |
-| `c2062c0`     | Sweep transition, per-frame optimisations, lite entry, dead-prop audit                            |
-| `9807786`     | Worker mode via OffscreenCanvas, DOM-free runtime                                                 |
-| _uncommitted_ | Full API redesign — see CHANGELOG "Unreleased". Twelve findings from the API review, all applied. |
+| commit    | what                                                                      |
+| --------- | ------------------------------------------------------------------------- |
+| `711a6fd` | Extracted the engine from `web_app1` and `sinafrontend` into a package    |
+| `09cb20b` | Fixed the black canvas (`desynchronized` + premultiplied alpha)           |
+| `7e7811b` | Reworked sprite quality, sphere layout, morph transition                  |
+| `c2062c0` | Sweep transition, per-frame optimisations, lite entry, dead-prop audit    |
+| `9807786` | Worker mode via OffscreenCanvas, DOM-free runtime                         |
+| `f3ceba2` | Full API redesign. Twelve findings from the API review, all applied.      |
+| `076a406` | Default choreography, auto mask, visual tests, lint and format            |
+| `55b77ef` | First-run path: React re-render churn, error surface, the client boundary |
+| `e095d05` | Four example scenes, the recorded README loop, a runnable copy button     |
+| `a671a38` | A VitePress site over the docs that already existed                       |
+| `409cff6` | The colour ramp defect, environment tests, release workflow               |
 
 **Nothing is published.** No GitHub remote, nothing on npm. That was deliberate.
+
+The four-phase plan those last four commits worked through is finished. Its
+record, with the measurement behind every decision, is the roadmap artifact —
+ask for the link if this is a fresh session, or read the CHANGELOG "Unreleased"
+section, which carries the same numbers.
 
 ---
 
@@ -128,7 +138,7 @@ requestAnimationFrame(() =>
 
 ## Not done
 
-- **Publishing.** Needs `gh auth refresh -h github.com` (the keyring token was invalid) and `npm login`. Name `stipple-gl` was unclaimed on npm as of 2026-08-25 — re-check before announcing.
+- **Publishing.** The workflow exists now: push a `v*` tag and `.github/workflows/release.yml` runs the full gate and publishes with npm provenance. It refuses if `package.json` disagrees with the tag. Still needs a `NPM_TOKEN` repository secret and a GitHub remote. Also needs `gh auth refresh -h github.com` (the keyring token was invalid) and `npm login`. Name `stipple-gl` was unclaimed on npm as of 2026-08-25 — re-check before announcing.
 - **LinkedIn post.** Three drafts in `docs/launch-post.md`, links left as placeholders. Recommended draft leads with the target-assignment insight. Record a 10–20s playground clip to attach; video matters more than wording there.
 - **Playground deployment.** `pnpm playground:build` outputs to `dist-playground/`. Not deployed anywhere yet.
 - **React worker component.** `stipple-gl/worker` is imperative only; `docs/worker.md` shows the `useEffect` pattern. A `<WorkerParticles>` component would be a small, obvious addition.
@@ -142,3 +152,4 @@ requestAnimationFrame(() =>
 1. **GPU transform-feedback backend.** Slots behind the existing `SimulationBackend` interface. Makes "runs on the GPU" fully true and lifts the ceiling past 100k particles. Pointer forces, shockwaves and target assignment all need reformulating as texture lookups — that is the hard part.
 2. **Linked lines between nearby particles.** The most visible feature gap versus tsparticles. Needs a spatial grid and a second draw call, and is CPU-expensive everywhere it exists.
 3. **Playground deployment and the launch post.** The only things between here and publishing.
+4. **Live editors on the docs pages.** Deliberately parked: they would embed a published `stipple-gl`, so they are broken links until it is on npm. The IIFE build makes them a one-line addition afterwards.
