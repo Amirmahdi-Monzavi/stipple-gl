@@ -44,6 +44,8 @@ const createMajorState = (capacity: number): MajorState => ({
   prevShapeY: new Float32Array(capacity),
   prevShapeZ: new Float32Array(capacity),
   tint: new Float32Array(capacity),
+  shapeRamp: new Float32Array(capacity),
+  prevShapeRamp: new Float32Array(capacity),
   shapeTint: new Uint32Array(capacity),
   prevShapeTint: new Uint32Array(capacity),
   hasShapeTint: false,
@@ -136,6 +138,8 @@ export class CpuBackend implements SimulationBackend {
   private spreadRadius = 0.62;
   private spreadVolume = 1;
   radiusPx = 1;
+  centerX = 0;
+  centerY = 0;
 
   get capacity(): number {
     return this.major.capacity + this.minor.capacity + this.emission.capacity;
@@ -222,6 +226,54 @@ export class CpuBackend implements SimulationBackend {
       minor.sizeRoll[i] = Math.pow(hash2i(i, 2731), minorBias);
       minor.brightRoll[i] = hash2i(i, 6791);
     }
+
+    // `setOptions` runs this whenever `color` changes, which is the path taken
+    // when a ramp is switched on while a shape is already displayed. Without it
+    // the shape-side ramp keeps whatever it held and the gradient goes on
+    // describing the sphere.
+    this.computeShapeRamp(options);
+    if (!this.major.hasShape) {
+      this.major.prevShapeRamp.set(this.major.shapeRamp.subarray(0, count));
+    }
+  }
+
+  /**
+   * Where a colour ramp lands once the particles have arrived.
+   *
+   * `tint` is measured off the dispersed sphere, which stops describing
+   * anything the moment a shape forms — the render pass blends the two by
+   * `morph` so the gradient travels with the field.
+   *
+   * Only `radius` is recomputed. `index` does not depend on position at all,
+   * and a shape is flat: `shapeZ` is a couple of pixels of jitter against a
+   * spread radius in the hundreds, so measuring `depth` against it would
+   * collapse the ramp to one flat colour rather than fix anything. The sphere's
+   * depth is the more useful thing to keep.
+   *
+   * Called from two places, because either half can arrive first: setting a
+   * shape while a ramp is configured, or switching to a ramp while a shape is
+   * already on screen. Doing it only on `setShape` left the second case
+   * describing the sphere, which is the whole defect this exists to fix.
+   */
+  private computeShapeRamp(options: StippleOptions): void {
+    const major = this.major;
+    const count = major.count;
+    const ramp =
+      typeof options.color === 'object' && options.color.type === 'ramp' ? options.color.by : null;
+
+    if (ramp !== 'radius' || !major.hasShape) {
+      // Nothing to travel to: hold the dispersed value so the blend is a no-op.
+      major.shapeRamp.set(major.tint.subarray(0, count));
+      return;
+    }
+
+    const radius = this.radiusPx || 1;
+    for (let i = 0; i < count; i++) {
+      const dx = major.shapeX[i]! - this.centerX;
+      const dy = major.shapeY[i]! - this.centerY;
+      const t = Math.hypot(dx, dy) / radius;
+      major.shapeRamp[i] = t > 1 ? 1 : t;
+    }
   }
 
   private layoutMajor(viewport: Viewport): void {
@@ -234,6 +286,8 @@ export class CpuBackend implements SimulationBackend {
 
     const centerX = viewport.width / 2;
     const centerY = viewport.height / 2;
+    this.centerX = centerX;
+    this.centerY = centerY;
     const fresh = major.seed[0] === 0 && major.seed[count - 1] === 0;
     const shell = 1 - this.spreadVolume;
     const jitter = 0.05;
@@ -312,6 +366,7 @@ export class CpuBackend implements SimulationBackend {
     if (!shapes) return;
 
     const count = major.count;
+    const hadShape = major.hasShape;
 
     // Snapshot the outgoing shape so a swap has somewhere to come from.
     if (keepPrevious && major.hasShape) {
@@ -319,6 +374,7 @@ export class CpuBackend implements SimulationBackend {
       major.prevShapeY.set(major.shapeY.subarray(0, count));
       major.prevShapeZ.set(major.shapeZ.subarray(0, count));
       if (major.hasShapeTint) major.prevShapeTint.set(major.shapeTint.subarray(0, count));
+      major.prevShapeRamp.set(major.shapeRamp.subarray(0, count));
     }
 
     this.pendingShape = points;
@@ -358,7 +414,14 @@ export class CpuBackend implements SimulationBackend {
       major.prevShapeZ.set(major.shapeZ.subarray(0, count));
     }
 
+    const first = !keepPrevious || !hadShape;
+
     major.hasShape = true;
+
+    // After hasShape, because the ramp only means anything once there is a
+    // shape to measure it against.
+    this.computeShapeRamp(options);
+    if (first) major.prevShapeRamp.set(major.shapeRamp.subarray(0, count));
   }
 
   reassign(options: StippleOptions): void {
@@ -501,7 +564,14 @@ export class CpuBackend implements SimulationBackend {
       let rgb = majorBase;
       if (perParticle) {
         if (ramp) {
-          const t = major.tint[i]!;
+          // Travel from where the particle was to where it is going, so the
+          // gradient describes the shape by the time the shape exists. A swap
+          // crossfades between the two shapes' ramps on its own clock.
+          const arrived = swapTint
+            ? major.prevShapeRamp[i]! + (major.shapeRamp[i]! - major.prevShapeRamp[i]!) * swapMix
+            : major.shapeRamp[i]!;
+          const spread = major.tint[i]!;
+          const t = morph <= 0 ? spread : spread + (arrived - spread) * morph;
           rgb =
             packColor(
               baseRgb[0] + (rampToRgb[0] - baseRgb[0]) * t,

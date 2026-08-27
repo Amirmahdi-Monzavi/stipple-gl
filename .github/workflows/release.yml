@@ -1,0 +1,80 @@
+name: Release
+
+# Publishing from CI rather than a laptop buys two things. npm records a
+# provenance attestation linking the tarball to this workflow run and the commit
+# it was built from, which is the trust marker shown on the package page. And
+# the version, the tag and the published artefact cannot drift apart, because
+# the tag is the only trigger and it is checked against package.json below.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      # Provenance is signed with a short-lived OIDC token minted for this run.
+      # Without this the publish still succeeds, silently, without attestation.
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          # Wires NODE_AUTH_TOKEN into .npmrc for the publish step.
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Tag matches package.json
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG."
+            echo "Publishing would put $PKG on npm under a tag claiming $TAG."
+            exit 1
+          fi
+          echo "Publishing $PKG."
+
+      # The same gate as a local `pnpm validate`, spelled out so a failure names
+      # the step that failed rather than reporting one long command.
+      - name: Lint
+        run: pnpm lint
+
+      - name: Format
+        run: pnpm format:check
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Dead option audit
+        run: pnpm audit-options
+
+      - name: Build
+        run: pnpm build
+
+      - name: Built output shape
+        run: pnpm check-dist
+
+      - name: Bundle size
+        run: pnpm size
+
+      # `access` and `provenance` come from publishConfig in package.json, so
+      # they hold for a local publish too and cannot drift from this file.
+      - name: Publish
+        run: pnpm publish --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

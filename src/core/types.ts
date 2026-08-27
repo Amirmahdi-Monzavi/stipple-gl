@@ -415,8 +415,20 @@ export interface MajorState {
   prevShapeX: Float32Array;
   prevShapeY: Float32Array;
   prevShapeZ: Float32Array;
-  /** Ramp position 0..1 per particle, precomputed for `color` ramps. */
+  /**
+   * Ramp position 0..1 per particle in the dispersed state, precomputed for
+   * `color` ramps.
+   */
   tint: Float32Array;
+  /**
+   * The same, measured against the shape's target positions instead.
+   *
+   * A ramp describes where a particle is, so once it has travelled into a shape
+   * the dispersed value no longer describes anything — the two are blended by
+   * `morph` so the gradient arrives with the shape.
+   */
+  shapeRamp: Float32Array;
+  prevShapeRamp: Float32Array;
   /** Packed 0x00RRGGBB sampled from the source SVG, when it carried fills. */
   shapeTint: Uint32Array;
   prevShapeTint: Uint32Array;

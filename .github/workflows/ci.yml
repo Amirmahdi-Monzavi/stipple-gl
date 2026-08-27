@@ -40,6 +40,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Built output shape
+        run: pnpm check-dist
+
       - name: Bundle size
         run: node scripts/measure.mjs
 
@@ -61,6 +64,11 @@ jobs:
 
       # Playwright's own Chromium, pinned to the installed @playwright/test.
       # Screenshot comparison is only meaningful against a fixed browser build.
+      # The examples load dist/stipple.global.js by relative path, so the
+      # script-tag build has to exist before the server can serve it.
+      - name: Build
+        run: pnpm build
+
       - name: Install browser
         run: pnpm exec playwright install --with-deps chromium
 
