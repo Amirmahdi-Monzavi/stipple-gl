@@ -92,7 +92,11 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "stage-site": "node scripts/stage-site.mjs",
+    "docs:dev": "pnpm build && pnpm playground:build && pnpm stage-site && vitepress dev docs",
+    "docs:build": "pnpm build && pnpm playground:build && pnpm stage-site && vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "peerDependencies": {
     "react": ">=17.0.0",
@@ -128,6 +132,7 @@
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.68.0",
     "vite": "^8.2.0",
+    "vitepress": "^1.6.4",
     "vitest": "^4.0.5"
   },
   "size-limit": [

@@ -71,6 +71,16 @@ This release restructures the public API. Nothing is published yet, so the break
 
 - **A recorded loop at the top.** A morphing particle field cannot be evaluated from prose, and neither npm nor GitHub renders a canvas. `pnpm record-gif` drives the real engine frame by frame with a seeded generator and a frozen clock, so the result is identical on any machine, and encodes in the page — see `scripts/gif-encoder.js`. Dependency-free: there is no image tooling in this repo and none is being added for one asset. The GIF is excluded from the published tarball, which stays at 129 KB.
 
+- Links to the examples and to every doc page, including the new reference below. Neither was reachable from anywhere before.
+
+### Documentation site
+
+- **VitePress over the docs that already existed.** `docs/.vitepress/config.ts` and a landing page are the whole addition — every one of the twelve pages under `docs/` was written before it and is unchanged by it. What the site adds is navigation, local search and somewhere for the examples and playground to live. `pnpm docs:dev` and `pnpm docs:build`; `DOCS_BASE` overrides the base path, since GitHub Pages serves a project site from a subpath and most other hosts do not.
+- **`docs/where-settings-live.md`** — instance options against shape options, which was the most likely question this API would generate. The three that exist at both levels do not resolve the way you would guess: a shape's `count` is clamped to the instance's so it can only ask for fewer, a shape's `color` is blended toward in proportion to `morph` rather than replacing, and `detail` is applied at sample time so changing it means rebuilding the shape.
+- `scripts/stage-site.mjs` assembles the non-markdown parts. The examples stay the single source of truth in `examples/` and are copied into `docs/public` with their script tag repointed from `../dist/stipple.global.js` to `/stipple.global.js` — they load a relative path so they can be opened straight from the filesystem during development, which the site cannot serve. It fails loudly if that path ever stops matching.
+- The nav links to the examples and the playground spell out `index.html` and carry `target: "_self"`. Both halves are needed and neither is obvious: VitePress is a single-page app, so its router intercepts a same-origin click, finds no markdown route for a staged static file, and renders its own 404 without asking the server; and the dev server does not resolve a directory to its index the way a static host does, so `/examples/` 404s under `vitepress dev` while `/examples/index.html` serves.
+- `launch-post.md` is excluded from the site. It stays in the repository; a draft announcement is not reference material.
+
 ### Tooling
 
 - **Visual regression tests.** 14 Playwright cases screenshot the playground: the dispersed sphere, a morphed shape, a transition caught mid-flight, all seven showpieces, uniform against edges detail, and a colour ramp. Determinism took three things — a seeded `Math.random` injected before any module runs, a frozen `performance.now`, and `requestAnimationFrame` neutralised at load so no uncounted frames slip through. Stopping the loop after load was not enough: `drift` rolls the generator once per ambient particle per frame, so a handful of real frames shifted every particle and produced a test that failed and then passed.

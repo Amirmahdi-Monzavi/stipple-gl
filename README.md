@@ -317,14 +317,35 @@ Requires **WebGL2** — Chrome/Edge 56+, Firefox 51+, Safari 15+. The constructo
 
 ## Documentation
 
+Every page below is also a site, with search and a playground:
+`pnpm docs:dev`.
+
 - [Getting started](docs/getting-started.md)
 - [Options reference](docs/options.md)
+- [Where settings live](docs/where-settings-live.md) — instance options against shape options, and which wins
+- [Shapes and SVG](docs/shapes.md)
+- [Image sources](docs/images.md)
+- [Presets](docs/presets.md)
 - [React](docs/react.md)
 - [Scroll and snap](docs/scroll.md)
-- [Shapes and SVG](docs/shapes.md)
-- [Performance](docs/performance.md)
 - [Worker mode](docs/worker.md)
+- [Events and sequencing](docs/events.md)
+- [Performance](docs/performance.md)
 - [Architecture](docs/architecture.md)
+
+## Examples
+
+Four standalone pages, one finished scene each and no control panel. They load
+the script-tag build by relative path, so there is nothing to compile — run
+`pnpm build`, then `pnpm examples`, and open
+[localhost:5181/examples/](http://localhost:5181/examples/).
+
+| Example                                       | Shows                                                            |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| [container.html](examples/container.html)     | A field bounded by a card rather than the viewport               |
+| [positioned.html](examples/positioned.html)   | `fitShapeToElement` aiming the shape at a layout slot            |
+| [scroll-snap.html](examples/scroll-snap.html) | `createScrollMorph`, a shape declared per section                |
+| [mobile.html](examples/mobile.html)           | A layout that reflows on its container, with a responsive budget |
 
 ## Licence
 
