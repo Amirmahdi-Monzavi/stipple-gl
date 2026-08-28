@@ -17,7 +17,13 @@ export default defineConfig({
   base: process.env.DOCS_BASE ?? '/',
   srcDir: '.',
   outDir: './.vitepress/dist',
-  cleanUrls: true,
+  // Links carry .html on purpose. Extensionless URLs need the host to rewrite
+  // them, and the rewrite that does it also strips the trailing slash from
+  // /playground/index.html and /examples/index.html -- which breaks every
+  // relative asset and link on those two static pages. Keeping the extension
+  // means the same build serves correctly from any static host and from the
+  // dev server, with nothing to configure.
+  cleanUrls: false,
   lastUpdated: true,
 
   // Kept in the repo, kept off the site: a draft announcement is not reference
