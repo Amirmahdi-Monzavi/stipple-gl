@@ -68,23 +68,20 @@ const floodBackground = (
   let sg = 0;
   let sb = 0;
   let n = 0;
+  const take = (x: number, y: number): void => {
+    const o = (y * width + x) * 4;
+    sr += pixels[o]!;
+    sg += pixels[o + 1]!;
+    sb += pixels[o + 2]!;
+    n++;
+  };
   for (let x = ix0; x < ix1; x++) {
-    for (const y of [iy0, iy1 - 1]) {
-      const o = (y * width + x) * 4;
-      sr += pixels[o]!;
-      sg += pixels[o + 1]!;
-      sb += pixels[o + 2]!;
-      n++;
-    }
+    take(x, iy0);
+    take(x, iy1 - 1);
   }
   for (let y = iy0; y < iy1; y++) {
-    for (const x of [ix0, ix1 - 1]) {
-      const o = (y * width + x) * 4;
-      sr += pixels[o]!;
-      sg += pixels[o + 1]!;
-      sb += pixels[o + 2]!;
-      n++;
-    }
+    take(ix0, y);
+    take(ix1 - 1, y);
   }
   if (n === 0) return null;
 
