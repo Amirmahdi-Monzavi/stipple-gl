@@ -4,6 +4,10 @@ A WebGL2 particle field that morphs into any SVG.
 
 ![A particle field dispersing, gathering into a hexagon, morphing into a spirograph, and dispersing again](docs/hero.gif)
 
+**[Playground](https://stipple-gl.vercel.app/playground/index.html)** ·
+**[Documentation](https://stipple-gl.vercel.app)** ·
+**[Examples](https://stipple-gl.vercel.app/examples/index.html)**
+
 Zero dependencies. Framework agnostic. **12.4 KB gzipped** for a particle background, 17.9 KB with SVG morphing, raster image sources and every behaviour.
 
 Optionally runs the whole simulation on a **Web Worker**, so it costs the main thread nothing.
@@ -317,7 +321,8 @@ Requires **WebGL2** — Chrome/Edge 56+, Firefox 51+, Safari 15+. The constructo
 
 ## Documentation
 
-Every page below is also a site, with search and a playground:
+These also read as a site with search at
+[stipple-gl.vercel.app](https://stipple-gl.vercel.app), or locally with
 `pnpm docs:dev`.
 
 - [Getting started](docs/getting-started.md)
@@ -336,9 +341,9 @@ Every page below is also a site, with search and a playground:
 ## Examples
 
 Four standalone pages, one finished scene each and no control panel. They load
-the script-tag build by relative path, so there is nothing to compile — run
-`pnpm build`, then `pnpm examples`, and open
-[localhost:5181/examples/](http://localhost:5181/examples/).
+the script-tag build by relative path, so there is nothing to compile. Browse them
+at [stipple-gl.vercel.app/examples](https://stipple-gl.vercel.app/examples/index.html),
+or run them locally with `pnpm build` then `pnpm examples`.
 
 | Example                                       | Shows                                                            |
 | --------------------------------------------- | ---------------------------------------------------------------- |

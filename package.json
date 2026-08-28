@@ -173,7 +173,7 @@
     "type": "git",
     "url": "git+https://github.com/Amirmahdi-Monzavi/stipple-gl.git"
   },
-  "homepage": "https://github.com/Amirmahdi-Monzavi/stipple-gl#readme",
+  "homepage": "https://stipple-gl.vercel.app",
   "bugs": {
     "url": "https://github.com/Amirmahdi-Monzavi/stipple-gl/issues"
   },
