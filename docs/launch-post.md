@@ -58,15 +58,12 @@ about a cause. The technical middle stays in plain language and never names an
 algorithm. The numbers arrive after the story, where they read as evidence
 rather than as specifications.
 
-**Two things to decide before posting.**
+**Links stay in the post.** The idea that LinkedIn penalises them is widely
+repeated and poorly evidenced, and burying the links in a comment adds real
+friction to the one thing the post is asking for — go and try it.
 
-LinkedIn suppresses reach on posts with external links. Moving the four links to
-the first comment usually reaches further, at the cost of a little friction. Your
-call, and it matters more with 500+ connections than it would with 50.
-
-The earlier drafts used bold Unicode for the name. It is invisible to screen
-readers, which read it character by character or skip it. Plain text is used
-above.
+**The name is plain text, not bold Unicode.** Those glyphs are read out character
+by character by screen readers, or skipped entirely.
 
 ---
 
