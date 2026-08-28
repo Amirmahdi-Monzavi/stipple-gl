@@ -28,7 +28,7 @@ export default defineConfig({
 
   // Kept in the repo, kept off the site: a draft announcement is not reference
   // material, and the README lives at the repository root.
-  srcExclude: ['launch-post.md', '../README.md', '../CHANGELOG.md', '../HANDOFF.md'],
+  srcExclude: ['../README.md', '../CHANGELOG.md', '../HANDOFF.md'],
 
   head: [
     ['link', { rel: 'icon', href: '/favicon.svg' }],

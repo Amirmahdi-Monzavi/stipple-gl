@@ -139,7 +139,7 @@ requestAnimationFrame(() =>
 ## Not done
 
 - **Publishing.** The workflow exists now: push a `v*` tag and `.github/workflows/release.yml` runs the full gate and publishes with npm provenance. It refuses if `package.json` disagrees with the tag. Still needs a `NPM_TOKEN` repository secret and a GitHub remote. Also needs `gh auth refresh -h github.com` (the keyring token was invalid) and `npm login`. Name `stipple-gl` was unclaimed on npm as of 2026-08-25 — re-check before announcing.
-- **LinkedIn post.** Three drafts in `docs/launch-post.md`, links left as placeholders. Recommended draft leads with the target-assignment insight. Record a 10–20s playground clip to attach; video matters more than wording there.
+- **LinkedIn post.** Drafted and kept outside the repository. Record a 10-20s playground clip to attach; video matters more than wording there.
 - **Playground deployment.** `pnpm playground:build` outputs to `dist-playground/`. Not deployed anywhere yet.
 - **React worker component.** `stipple-gl/worker` is imperative only; `docs/worker.md` shows the `useEffect` pattern. A `<WorkerParticles>` component would be a small, obvious addition.
 - **Linked lines were deliberately skipped.** It is tsparticles' signature feature, it is CPU-expensive everywhere it exists, and chasing it fights on their ground. Shape morphing is the differentiator.

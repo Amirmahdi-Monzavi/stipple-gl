@@ -79,7 +79,7 @@ This release restructures the public API. Nothing is published yet, so the break
 - **`docs/where-settings-live.md`** — instance options against shape options, which was the most likely question this API would generate. The three that exist at both levels do not resolve the way you would guess: a shape's `count` is clamped to the instance's so it can only ask for fewer, a shape's `color` is blended toward in proportion to `morph` rather than replacing, and `detail` is applied at sample time so changing it means rebuilding the shape.
 - `scripts/stage-site.mjs` assembles the non-markdown parts. The examples stay the single source of truth in `examples/` and are copied into `docs/public` with their script tag repointed from `../dist/stipple.global.js` to `/stipple.global.js` — they load a relative path so they can be opened straight from the filesystem during development, which the site cannot serve. It fails loudly if that path ever stops matching.
 - The nav links to the examples and the playground spell out `index.html` and carry `target: "_self"`. Both halves are needed and neither is obvious: VitePress is a single-page app, so its router intercepts a same-origin click, finds no markdown route for a staged static file, and renders its own 404 without asking the server; and the dev server does not resolve a directory to its index the way a static host does, so `/examples/` 404s under `vitepress dev` while `/examples/index.html` serves.
-- `launch-post.md` is excluded from the site. It stays in the repository; a draft announcement is not reference material.
+- Announcement drafts are not tracked. They are working notes, not reference material.
 
 ### Release
 
