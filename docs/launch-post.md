@@ -1,8 +1,72 @@
 # LinkedIn launch post
 
-Three drafts. The first is the recommended one — it leads with a concrete engineering insight rather than an announcement, which is what makes technical posts travel.
+The final version is first, with the real links in it. The three earlier drafts
+are kept below for reference.
 
-Replace `github.com/…` and the playground URL before posting. Attach a screen recording of the playground: disperse → morph → drag an SVG in → morph again. Video outperforms stills heavily on LinkedIn.
+Attach a screen recording of the playground rather than a still — disperse,
+morph, drag an SVG in, morph again. `docs/hero.gif` works if you would rather
+not record one.
+
+---
+
+## Final — written for a feed that is not all engineers
+
+> I spent a week convinced my particle animation looked wrong because the easing
+> was off.
+>
+> It wasn't the easing.
+>
+> When a cloud of particles forms a shape, you sample the shape into points and
+> move each particle onto one. The part nobody mentions is _which_ particle goes
+> to which point. I was pairing them at random — so a particle on the left of the
+> cloud would fly to the right of the shape, crossing hundreds of others on the
+> way. Thousands of paths tangling at once. It reads as static resolving into a
+> picture, and no amount of easing fixes it, because the easing was never the
+> problem.
+>
+> The fix was about thirty lines. Sort the particles by their angle around the
+> centre of the cloud, sort the target points by their angle around the centre of
+> the shape, and pair them in that order. Nobody crosses anybody. The shape
+> condenses instead of shuffling.
+>
+> I had also added a swirl effect to disguise the churn. I got to delete it.
+>
+> That is one of a dozen or so things I fixed while pulling this out of two
+> production apps and into an open-source package.
+>
+> stipple-gl — a WebGL2 particle field that morphs into any SVG.
+>
+> → 12.4 KB gzipped, zero dependencies, no three.js
+> → 25,000 particles at 8 ms of CPU per frame
+> → No allocation per frame, so the garbage collector stays out of the animation
+> → TypeScript, with a React binding
+> → Drop any SVG in and it becomes the target
+>
+> Play with it (drag your own SVG onto it): https://stipple-gl.vercel.app/playground/index.html
+> Docs and examples: https://stipple-gl.vercel.app
+> Source: https://github.com/Amirmahdi-Monzavi/stipple-gl
+> npm: npm i stipple-gl
+>
+> Built it for a face-and-voice identity verification product and a corporate
+> site. Figured other people might want it too.
+>
+> #webgl #typescript #frontend #opensource #creativecoding
+
+**Why this shape.** The opening is a mistake rather than an announcement, which
+gives a non-engineer somewhere to stand — everyone has been confidently wrong
+about a cause. The technical middle stays in plain language and never names an
+algorithm. The numbers arrive after the story, where they read as evidence
+rather than as specifications.
+
+**Two things to decide before posting.**
+
+LinkedIn suppresses reach on posts with external links. Moving the four links to
+the first comment usually reaches further, at the cost of a little friction. Your
+call, and it matters more with 500+ connections than it would with 50.
+
+The earlier drafts used bold Unicode for the name. It is invisible to screen
+readers, which read it character by character or skip it. Plain text is used
+above.
 
 ---
 
