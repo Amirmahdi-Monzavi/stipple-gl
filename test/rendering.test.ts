@@ -56,7 +56,17 @@ describe('camera-aware culling', () => {
   it('keeps particles the camera will pull back into view when zoomed out', () => {
     // Pinned rather than inherited: the assertions below depend on the sphere
     // overflowing the viewport, and that is a default which can legitimately move.
-    const { backend, options } = boot({ count: 4000, minorCount: 0, spread: { radius: 0.62 } });
+    const { backend, options } = boot({
+      count: 4000,
+      minorCount: 0,
+      spread: { radius: 0.62 },
+      // Off, because these assertions count packed particles exactly and the
+      // ambient spark branch rolls Math.random() < 0.0004 for every eighth
+      // major particle while the field is dispersed. Nothing spawns on most
+      // frames, so the count is 4000 -- until one does and it is 4001. These
+      // tests are about camera culling; a stray spark is noise in them.
+      emission: { enabled: false },
+    });
     const state = frameState();
     backend.step(state, options);
 
@@ -73,7 +83,17 @@ describe('camera-aware culling', () => {
   it('culls more aggressively when zoomed in', () => {
     // Pinned rather than inherited: the assertions below depend on the sphere
     // overflowing the viewport, and that is a default which can legitimately move.
-    const { backend, options } = boot({ count: 4000, minorCount: 0, spread: { radius: 0.62 } });
+    const { backend, options } = boot({
+      count: 4000,
+      minorCount: 0,
+      spread: { radius: 0.62 },
+      // Off, because these assertions count packed particles exactly and the
+      // ambient spark branch rolls Math.random() < 0.0004 for every eighth
+      // major particle while the field is dispersed. Nothing spawns on most
+      // frames, so the count is 4000 -- until one does and it is 4001. These
+      // tests are about camera culling; a stray spark is noise in them.
+      emission: { enabled: false },
+    });
     const state = frameState();
     backend.step(state, options);
 
@@ -86,7 +106,17 @@ describe('camera-aware culling', () => {
   it('follows the camera offset', () => {
     // Pinned rather than inherited: the assertions below depend on the sphere
     // overflowing the viewport, and that is a default which can legitimately move.
-    const { backend, options } = boot({ count: 4000, minorCount: 0, spread: { radius: 0.62 } });
+    const { backend, options } = boot({
+      count: 4000,
+      minorCount: 0,
+      spread: { radius: 0.62 },
+      // Off, because these assertions count packed particles exactly and the
+      // ambient spark branch rolls Math.random() < 0.0004 for every eighth
+      // major particle while the field is dispersed. Nothing spawns on most
+      // frames, so the count is 4000 -- until one does and it is 4001. These
+      // tests are about camera culling; a stray spark is noise in them.
+      emission: { enabled: false },
+    });
     const state = frameState();
     backend.step(state, options);
 
