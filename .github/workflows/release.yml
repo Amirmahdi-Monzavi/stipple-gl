@@ -72,9 +72,15 @@ jobs:
       - name: Bundle size
         run: pnpm size
 
+      # `npm publish` rather than `pnpm publish`. pnpm first attempts npm's OIDC
+      # trusted-publisher exchange, which 404s until the package exists and has
+      # a publisher configured, then falls back to the token — so a failure here
+      # arrives buried under a warning about something that was never set up.
+      # npm reads NODE_AUTH_TOKEN directly and does one thing.
+      #
       # `access` and `provenance` come from publishConfig in package.json, so
       # they hold for a local publish too and cannot drift from this file.
       - name: Publish
-        run: pnpm publish --no-git-checks
+        run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
