@@ -44,11 +44,17 @@ const floodBackground = (
   rect: { x0: number; y0: number; x1: number; y1: number },
   tolerance: number,
 ): Uint8Array | null => {
-  const x0 = Math.max(0, Math.ceil(rect.x0));
-  const y0 = Math.max(0, Math.ceil(rect.y0));
-  const x1 = Math.min(width, Math.floor(rect.x1));
-  const y1 = Math.min(height, Math.floor(rect.y1));
-  if (x1 - x0 < 4 || y1 - y0 < 4) return null;
+  // Two rectangles are in play and conflating them is what puts a seam down the
+  // edge of the picture.
+  //
+  // This one is the image rounded *inward*, so every pixel in it is certainly
+  // image and never the margin beside it. It is what the border colour is read
+  // from, and what coverage is judged against — both need a trustworthy sample.
+  const ix0 = Math.max(0, Math.ceil(rect.x0));
+  const iy0 = Math.max(0, Math.ceil(rect.y0));
+  const ix1 = Math.min(width, Math.floor(rect.x1));
+  const iy1 = Math.min(height, Math.floor(rect.y1));
+  if (ix1 - ix0 < 4 || iy1 - iy0 < 4) return null;
 
   const total = width * height;
   if (background.length < total) background = new Uint8Array(total);
@@ -62,8 +68,8 @@ const floodBackground = (
   let sg = 0;
   let sb = 0;
   let n = 0;
-  for (let x = x0; x < x1; x++) {
-    for (const y of [y0, y1 - 1]) {
+  for (let x = ix0; x < ix1; x++) {
+    for (const y of [iy0, iy1 - 1]) {
       const o = (y * width + x) * 4;
       sr += pixels[o]!;
       sg += pixels[o + 1]!;
@@ -71,8 +77,8 @@ const floodBackground = (
       n++;
     }
   }
-  for (let y = y0; y < y1; y++) {
-    for (const x of [x0, x1 - 1]) {
+  for (let y = iy0; y < iy1; y++) {
+    for (const x of [ix0, ix1 - 1]) {
       const o = (y * width + x) * 4;
       sr += pixels[o]!;
       sg += pixels[o + 1]!;
@@ -108,29 +114,42 @@ const floodBackground = (
     floodQueue[tail++] = index;
   };
 
-  for (let x = x0; x < x1; x++) {
-    push(x, y0);
-    push(x, y1 - 1);
+  // The second rectangle is the whole canvas, and the flood runs over all of it.
+  //
+  // An image centred on the raster rarely lands on whole pixels, so its outer
+  // row or column is a half-covered blend of picture and empty canvas. Confine
+  // the flood to the rounded rectangle above and that blend sits just outside
+  // it, unreachable — it survives as ink and draws as a line down the edge of
+  // the shape. Flooding the full canvas reaches it, and it is let through on
+  // alpha, because a partly covered pixel is partly margin.
+  for (let x = 0; x < width; x++) {
+    push(x, 0);
+    push(x, height - 1);
   }
-  for (let y = y0; y < y1; y++) {
-    push(x0, y);
-    push(x1 - 1, y);
+  for (let y = 0; y < height; y++) {
+    push(0, y);
+    push(width - 1, y);
   }
 
-  let filled = tail;
   while (head < tail) {
     const index = floodQueue[head++]!;
     const x = index % width;
     const y = (index / width) | 0;
-    if (x > x0) push(x - 1, y);
-    if (x < x1 - 1) push(x + 1, y);
-    if (y > y0) push(x, y - 1);
-    if (y < y1 - 1) push(x, y + 1);
-    filled = tail;
+    if (x > 0) push(x - 1, y);
+    if (x < width - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < height - 1) push(x, y + 1);
   }
 
-  const area = (x1 - x0) * (y1 - y0);
-  const share = filled / area;
+  // Coverage is judged inside the image alone. The empty margin around it is
+  // background by definition and counting it would push every source past the
+  // upper bound and refuse the mask outright.
+  let inside = 0;
+  for (let y = iy0; y < iy1; y++) {
+    const row = y * width;
+    for (let x = ix0; x < ix1; x++) if (background[row + x]) inside++;
+  }
+  const share = inside / ((ix1 - ix0) * (iy1 - iy0));
   // Under 8% the border never seeded properly; over 92% there was no subject
   // left standing. Neither is a background worth masking with.
   if (share < 0.08 || share > 0.92) return null;

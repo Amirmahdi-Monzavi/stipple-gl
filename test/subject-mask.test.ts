@@ -179,3 +179,44 @@ describe('the flood declines when it should', () => {
     expect(Number.isFinite(out.points[0] ?? 0)).toBe(true);
   });
 });
+
+/**
+ * A portrait figure on an opaque white ground. Its aspect ratio is chosen so
+ * the image lands on the square raster at a fractional horizontal offset and a
+ * whole-numbered vertical one — the asymmetry that made the seam appear down
+ * the sides of a picture and never across the top of it.
+ */
+const TALL_W = 61;
+const TALL_H = 121;
+const portrait = (x: number, y: number): number[] =>
+  x > TALL_W * 0.25 && x < TALL_W * 0.75 && y > TALL_H * 0.2 && y < TALL_H * 0.8
+    ? [20, 20, 20, 255]
+    : [255, 255, 255, 255];
+
+/** The horizontal reach of the sampled points, as a share of the image width. */
+const horizontalReach = (): number => {
+  const shape = shapeFromImage(stubImage(TALL_W, TALL_H, portrait), {
+    scale: 1,
+    position: { x: 0.5, y: 0.5 },
+  });
+  shape.mask = 'subject';
+  const out = sample(shape);
+  let min = Infinity;
+  let max = -Infinity;
+  for (let i = 0; i < out.points.length; i += 2) {
+    const x = out.points[i]!;
+    if (x < min) min = x;
+    if (x > max) max = x;
+  }
+  // The drawn image is as wide as the raster is tall, times the aspect ratio.
+  return (max - min) / ((SIZE * 2 * TALL_W) / TALL_H);
+};
+
+describe('the flood reaches the edge of the picture', () => {
+  it('leaves no seam down the sides of an image on a fractional offset', () => {
+    // The figure covers the middle half of the frame, so that is how far the
+    // points should reach. A seam of unflooded background parks a column of
+    // particles hard against each edge and pushes the reach to the full width.
+    expect(horizontalReach()).toBeLessThan(0.6);
+  });
+});
