@@ -30,10 +30,17 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          # Wires NODE_AUTH_TOKEN into .npmrc for the publish step.
+          # Points the publish at the public registry. No credential is written
+          # here: the publish authenticates by OIDC identity, not a token.
           registry-url: https://registry.npmjs.org
 
       - run: pnpm install --frozen-lockfile
+
+      # setup-node ships npm 10 with Node 22, and OIDC trusted publishing needs
+      # 11.5.1 or newer. Without this the publish falls back to looking for a
+      # token, which is exactly what trusted publishing exists to remove.
+      - name: Use an npm that can authenticate by identity
+        run: npm install --global npm@latest
 
       - name: Tag matches package.json
         run: |
@@ -72,15 +79,16 @@ jobs:
       - name: Bundle size
         run: pnpm size
 
-      # `npm publish` rather than `pnpm publish`. pnpm first attempts npm's OIDC
-      # trusted-publisher exchange, which 404s until the package exists and has
-      # a publisher configured, then falls back to the token — so a failure here
-      # arrives buried under a warning about something that was never set up.
-      # npm reads NODE_AUTH_TOKEN directly and does one thing.
+      # No token. The package has a trusted publisher configured for this
+      # workflow, so the publish authenticates with the OIDC identity minted by
+      # the id-token permission above — the same one that signs provenance.
       #
-      # `access` and `provenance` come from publishConfig in package.json, so
-      # they hold for a local publish too and cannot drift from this file.
+      # Deliberately no fallback to a secret. An empty NODE_AUTH_TOKEN writes an
+      # empty credential into .npmrc, and npm sends that rather than reaching
+      # for OIDC, which then fails in a way that reads like a bad token instead
+      # of a missing publisher.
+      #
+      # access and provenance come from publishConfig in package.json, so they
+      # hold for any publish and cannot drift from this file.
       - name: Publish
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
