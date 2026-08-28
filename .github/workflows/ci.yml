@@ -82,3 +82,6 @@ jobs:
           name: visual-diff
           path: visual/.results/
           retention-days: 7
+          # An assertion failure writes no diff images, and an empty upload is
+          # not worth a warning on an already-red run.
+          if-no-files-found: ignore

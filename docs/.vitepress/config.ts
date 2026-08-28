@@ -90,12 +90,12 @@ export default defineConfig({
       },
     ],
 
-    socialLinks: [{ icon: 'github', link: 'https://github.com/amirmahdikaren/stipple-gl' }],
+    socialLinks: [{ icon: 'github', link: 'https://github.com/Amirmahdi-Monzavi/stipple-gl' }],
 
     search: { provider: 'local' },
 
     editLink: {
-      pattern: 'https://github.com/amirmahdikaren/stipple-gl/edit/master/docs/:path',
+      pattern: 'https://github.com/Amirmahdi-Monzavi/stipple-gl/edit/master/docs/:path',
       text: 'Edit this page on GitHub',
     },
 

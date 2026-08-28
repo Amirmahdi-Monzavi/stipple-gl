@@ -299,13 +299,25 @@ test('mobile: the shape travels to its new slot in one move, not two', async ({ 
       (buttons[button] as HTMLButtonElement).click();
 
       const samples: number[] = [];
+      const counts: number[] = [];
       for (let i = 0; i < 90; i++) {
         await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
         samples.push(distance());
+        counts.push(field.options.count);
       }
 
+      /*
+        Only compare frames where the population did not change.
+
+        The centroid is a mean over the live particles, and widening the panel
+        re-budgets upward — 1,400 to 4,000 here. The particles that appear are
+        still in the spread, so including them moves the mean without anything
+        having reversed. Measured: a 2.1px step landing on exactly the frame the
+        count changes, which is noise dressed as a finding.
+      */
       let worstBacktrack = 0;
       for (let i = 1; i < samples.length; i++) {
+        if (counts[i] !== counts[i - 1]) continue;
         worstBacktrack = Math.max(worstBacktrack, samples[i]! - samples[i - 1]!);
       }
       return { start: samples[0]!, end: samples[samples.length - 1]!, worstBacktrack };

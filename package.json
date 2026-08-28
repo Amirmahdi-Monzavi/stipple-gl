@@ -171,11 +171,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/amirmahdikaren/stipple-gl.git"
+    "url": "git+https://github.com/Amirmahdi-Monzavi/stipple-gl.git"
   },
-  "homepage": "https://github.com/amirmahdikaren/stipple-gl#readme",
+  "homepage": "https://github.com/Amirmahdi-Monzavi/stipple-gl#readme",
   "bugs": {
-    "url": "https://github.com/amirmahdikaren/stipple-gl/issues"
+    "url": "https://github.com/Amirmahdi-Monzavi/stipple-gl/issues"
   },
   "unpkg": "./dist/stipple.global.js",
   "jsdelivr": "./dist/stipple.global.js",
