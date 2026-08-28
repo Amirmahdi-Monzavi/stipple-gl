@@ -4,7 +4,7 @@
   "description": "GPU-rendered WebGL2 particle field that morphs into any SVG. Zero dependencies, framework agnostic, with a first-class React binding.",
   "type": "module",
   "license": "MIT",
-  "author": "Amirmahdi Karen",
+  "author": "Amirmahdi Monzavi",
   "keywords": [
     "webgl",
     "webgl2",
