@@ -1,8 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
-This release restructures the public API. Nothing is published yet, so the breaking changes are taken now rather than lived with.
+Separating a subject from its background on artwork exported without transparency.
+
+### Added
+
+- **`mask: 'subject'`, and `auto` reaches for it.** Luminance masking cannot separate a white glove inside a black outline from the white page behind it, because the pixels are identical — so an opaque cartoon lost every enclosed light region and came out full of holes. What distinguishes them is reachability, not brightness: the page touches the edge of the image and the glove is walled in. The new mask floods inward from the border and keeps whatever the flood cannot reach. Measured on an opaque export of the same artwork: white particles went from 0 to 348, against 318 for the transparent version of the same figure, which is the reference. The flood covers the whole raster rather than the rectangle the image landed on: a picture centred on the raster rarely lands on whole pixels, and confining the flood to the rounded rectangle left its half-covered outer column unreachable — a seam of background that survived as ink and drew as a line down each side of the shape.
+- It declines rather than guesses. A border that is not one colour gives it nothing to seed from, and a flood covering under 8% or over 92% of the frame is discarded, so a photograph falls straight back to the split it used before. Asking for it is never worse than not asking.
+
+## 0.1.0
+
+First release, extracted from two production applications and rebuilt as a framework-agnostic engine.
+
+The API was restructured in the run-up to it, so what follows describes the shape it settled on rather than a diff against anything anyone was using.
 
 ### Breaking
 
@@ -29,14 +40,11 @@ This release restructures the public API. Nothing is published yet, so the break
 
 - **Raster image sources.** PNG, JPEG, WebP, AVIF, GIF, a canvas, an ImageBitmap or a video frame can all be a shape. Decoding goes through `createImageBitmap`, so the supported list is whatever the browser decodes rather than anything hardcoded.
 - **`shapeFromFile(file)`** picks the strategy for you: vector for plain SVG, rasterised for SVG that uses gradients, filters, patterns or stylesheets, and the image decoder for everything else. `svgNeedsRaster` exposes the test.
-- **`mask` and `threshold` on a shape** — `'auto'` (default), `'alpha'`, `'dark'`, `'light'` or `'subject'`. See Fixed for what `auto` does.
+- **`mask` and `threshold` on a shape** — `'auto'` (default), `'alpha'`, `'dark'` or `'light'`. See Fixed for what `auto` does.
 - `imageFromURL`, `imageFromBlob`, `rasterizeSVG`, `shapeFromImage`, `shapeFromImageURL` and `shapeFromSVGImage`.
 - **`detail` and `detailStrength` on a shape** — `'uniform'` (default), `'edges'` or `'density'`. Uniform sampling over a flat-filled illustration spends ~86% of the budget on featureless interior and reads as a silhouette; edge weighting puts 2.4x more particles on contours for a 3% loss of coverage.
 - `docs/images.md`.
 - **`isSupported()`** — a pre-flight check so an unsupported browser is a branch rather than a `try`/`catch`. It releases its probe context immediately, since browsers cap live contexts at around sixteen and a check that consumed one would be a poor trade for a boolean, and memoises the answer: measured at 15.5 ms for the first call and 0 ms thereafter. Returns `false` without a DOM, so the same branch works either side of hydration. Exported from the root, the lite entry and the script-tag build.
-
-- **`mask: 'subject'`, and `auto` reaches for it.** Luminance masking cannot separate a white glove inside a black outline from the white page behind it, because the pixels are identical — so an opaque cartoon lost every enclosed light region and came out full of holes. What distinguishes them is reachability, not brightness: the page touches the edge of the image and the glove is walled in. The new mask floods inward from the border and keeps whatever the flood cannot reach. Measured on an opaque export of the same artwork: white particles went from 0 to 348, against 318 for the transparent version of the same figure, which is the reference. The flood covers the whole raster rather than the rectangle the image landed on: a picture centred on the raster rarely lands on whole pixels, and confining the flood to the rounded rectangle left its half-covered outer column unreachable — a seam of background that survived as ink and drew as a line down each side of the shape.
-- It declines rather than guesses. A border that is not one colour gives it nothing to seed from, and a flood covering under 8% or over 92% of the frame is discarded, so a photograph falls straight back to the split it used before. Asking for it is never worse than not asking.
 
 ### Changed
 
@@ -138,13 +146,7 @@ This release restructures the public API. Nothing is published yet, so the break
 - The React bindings had no test coverage of any kind, which is why the re-render defect went unnoticed. `test/support/dom-stub.ts` stands up the smallest browser the real engine will build in, opt-in so the rest of the suite keeps running against untouched globals.
 - `visual/lifecycle.spec.ts` adds three functional browser tests for what no stub can reproduce: twenty mount/destroy cycles against the context cap, forced context loss and recovery, and the OffscreenCanvas worker transfer. Disabling `loseContext()` in `dispose()` produces six "Too many active WebGL contexts" warnings across those cycles, so that line is load-bearing rather than defensive.
 
-## 0.1.0
-
-First release.
-
-Extracted from two production applications, rebuilt as a framework-agnostic engine.
-
-### Added
+### The engine, as extracted
 
 - `Stipple` engine — WebGL2 point renderer, morph scalar, three particle layers.
 - `SimulationBackend` interface with a bundled optimised `CpuBackend`.

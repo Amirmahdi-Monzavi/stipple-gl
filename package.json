@@ -1,6 +1,6 @@
 {
   "name": "stipple-gl",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GPU-rendered WebGL2 particle field that morphs into any SVG. Zero dependencies, framework agnostic, with a first-class React binding.",
   "type": "module",
   "license": "MIT",
