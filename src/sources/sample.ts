@@ -19,6 +19,124 @@ type Raster = {
 
 let raster: Raster | null = null;
 let hits = new Uint32Array(0);
+let background = new Uint8Array(0);
+let floodQueue = new Int32Array(0);
+
+/**
+ * Which pixels belong to the background, by flooding inward from the border.
+ *
+ * Luminance masking cannot tell a white glove from the white page behind it —
+ * they are the same pixels, and the only thing separating them is that one is
+ * reachable from the edge of the image and the other is walled in by an
+ * outline. So walk in from the border and keep going while the colour stays
+ * close to what the border is made of. Everything the walk cannot reach is
+ * subject, whatever its brightness.
+ *
+ * Returns `null` when the result is not worth trusting: a flood that swallows
+ * almost everything means the border colour appears throughout (a photograph),
+ * and one that barely moves means the border is not uniform enough to seed
+ * from. Both fall back to the luminance split.
+ */
+const floodBackground = (
+  pixels: Uint8ClampedArray,
+  width: number,
+  height: number,
+  rect: { x0: number; y0: number; x1: number; y1: number },
+  tolerance: number,
+): Uint8Array | null => {
+  const x0 = Math.max(0, Math.ceil(rect.x0));
+  const y0 = Math.max(0, Math.ceil(rect.y0));
+  const x1 = Math.min(width, Math.floor(rect.x1));
+  const y1 = Math.min(height, Math.floor(rect.y1));
+  if (x1 - x0 < 4 || y1 - y0 < 4) return null;
+
+  const total = width * height;
+  if (background.length < total) background = new Uint8Array(total);
+  else background.fill(0, 0, total);
+  if (floodQueue.length < total) floodQueue = new Int32Array(total);
+
+  // What the border is made of. Averaging it rather than taking one corner
+  // survives a little noise or a gradient, and a border that is not one colour
+  // produces a reference that matches nothing, which the coverage test catches.
+  let sr = 0;
+  let sg = 0;
+  let sb = 0;
+  let n = 0;
+  for (let x = x0; x < x1; x++) {
+    for (const y of [y0, y1 - 1]) {
+      const o = (y * width + x) * 4;
+      sr += pixels[o]!;
+      sg += pixels[o + 1]!;
+      sb += pixels[o + 2]!;
+      n++;
+    }
+  }
+  for (let y = y0; y < y1; y++) {
+    for (const x of [x0, x1 - 1]) {
+      const o = (y * width + x) * 4;
+      sr += pixels[o]!;
+      sg += pixels[o + 1]!;
+      sb += pixels[o + 2]!;
+      n++;
+    }
+  }
+  if (n === 0) return null;
+
+  const br = sr / n;
+  const bg = sg / n;
+  const bb = sb / n;
+  const limit = tolerance * 255;
+  const limitSq = limit * limit * 3;
+
+  const matches = (index: number): boolean => {
+    const o = index * 4;
+    // Transparent margin is background by definition.
+    if (pixels[o + 3]! < 250) return true;
+    const dr = pixels[o]! - br;
+    const dg = pixels[o + 1]! - bg;
+    const db = pixels[o + 2]! - bb;
+    return dr * dr + dg * dg + db * db <= limitSq;
+  };
+
+  let head = 0;
+  let tail = 0;
+  const push = (x: number, y: number): void => {
+    const index = y * width + x;
+    if (background[index]) return;
+    if (!matches(index)) return;
+    background[index] = 1;
+    floodQueue[tail++] = index;
+  };
+
+  for (let x = x0; x < x1; x++) {
+    push(x, y0);
+    push(x, y1 - 1);
+  }
+  for (let y = y0; y < y1; y++) {
+    push(x0, y);
+    push(x1 - 1, y);
+  }
+
+  let filled = tail;
+  while (head < tail) {
+    const index = floodQueue[head++]!;
+    const x = index % width;
+    const y = (index / width) | 0;
+    if (x > x0) push(x - 1, y);
+    if (x < x1 - 1) push(x + 1, y);
+    if (y > y0) push(x, y - 1);
+    if (y < y1 - 1) push(x, y + 1);
+    filled = tail;
+  }
+
+  const area = (x1 - x0) * (y1 - y0);
+  const share = filled / area;
+  // Under 8% the border never seeded properly; over 92% there was no subject
+  // left standing. Neither is a background worth masking with.
+  if (share < 0.08 || share > 0.92) return null;
+
+  return background;
+};
 
 const acquireRaster = (width: number, height: number): Raster => {
   if (raster && raster.width === width && raster.height === height) {
@@ -350,7 +468,28 @@ export const sampleShape = (
   // a photo or a JPEG is opaque everywhere, so it needs a luminance cutoff or
   // the whole rectangle becomes the shape.
   const requested = shape.mask ?? 'auto';
-  const mask = requested === 'auto' ? resolveMask(pixels, rw, drawn) : requested;
+  let mask = requested === 'auto' ? resolveMask(pixels, rw, drawn) : requested;
+
+  /*
+    Try the flood whenever the alternative is a luminance split.
+
+    `auto` reaching a luminance mask means the source is opaque, which is
+    exactly the case where enclosed light regions — a white glove inside a black
+    outline, a shirt, a muzzle — get thrown away with the background because
+    luminance cannot tell them apart. The flood can, when the border is one
+    colour, and declines when it is not, so `auto` is never made worse by
+    asking: a photograph falls straight back to the split it would have used.
+  */
+  const luminanceSplit = mask === 'dark' || mask === 'light';
+  let backgroundMap: Uint8Array | null = null;
+
+  if (mask === 'subject' || (requested === 'auto' && luminanceSplit)) {
+    backgroundMap = floodBackground(pixels, rw, rh, drawn, shape.threshold ?? 0.12);
+    // Asked for explicitly and refused: the luminance split is still better
+    // than nothing, and matches what `auto` would have chosen anyway.
+    if (!backgroundMap && mask === 'subject') mask = 'dark';
+  }
+
   const threshold = shape.threshold ?? (mask === 'alpha' ? 0.03 : 0.5);
   const alphaFloor = mask === 'alpha' ? threshold * 255 : 8;
   const lumCutoff = threshold * 255;
@@ -359,7 +498,9 @@ export const sampleShape = (
   for (let i = 0; i < total; i++) {
     const o = i * 4;
     if (pixels[o + 3]! <= alphaFloor) continue;
-    if (mask !== 'alpha') {
+    if (backgroundMap) {
+      if (backgroundMap[i]) continue;
+    } else if (mask !== 'alpha') {
       const lum = 0.2126 * pixels[o]! + 0.7152 * pixels[o + 1]! + 0.0722 * pixels[o + 2]!;
       if (mask === 'dark' ? lum > lumCutoff : lum < lumCutoff) continue;
     }

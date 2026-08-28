@@ -59,12 +59,43 @@ An opaque image has no alpha to mask with: every pixel qualifies, and the "shape
 await shapeFromFile(photo, { mask: 'dark', threshold: 0.45 });
 ```
 
-| `mask`    | ink is                                                                                                                                                           |
-| --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `'auto'`  | **the default.** Inspects the image: real transparency means alpha, otherwise it falls through to luminance and keeps whichever of dark or light is the minority |
-| `'alpha'` | anything not transparent — right for PNG and SVG with a cut-out background                                                                                       |
-| `'dark'`  | opaque pixels **below** the luminance threshold — a dark subject on a light ground                                                                               |
-| `'light'` | opaque pixels **above** it — a light subject on a dark ground                                                                                                    |
+| `mask`      | ink is                                                                                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `'auto'`    | **the default.** Inspects the image: real transparency means alpha, otherwise it falls through to luminance and keeps whichever of dark or light is the minority |
+| `'alpha'`   | anything not transparent — right for PNG and SVG with a cut-out background                                                                                       |
+| `'dark'`    | opaque pixels **below** the luminance threshold — a dark subject on a light ground                                                                               |
+| `'light'`   | opaque pixels **above** it — a light subject on a dark ground                                                                                                    |
+| `'subject'` | everything the background does not reach — see below                                                                                                             |
+
+### Enclosed light regions
+
+Luminance masking has one blind spot, and it shows up on exactly the artwork
+people reach for first: cartoons and logos exported without transparency.
+
+A white glove inside a black outline is the same pixel value as the white page
+behind it. Splitting by luminance keeps the dark minority and throws both away,
+so the glove comes out as a hole. Same for a shirt, a muzzle, an eye.
+
+What separates them is not brightness but reachability: the page touches the
+edge of the image, the glove is walled in. `subject` floods inward from the
+border and keeps everything the flood cannot reach.
+
+```ts
+await shapeFromFile(logo, { mask: 'subject' });
+```
+
+`auto` already tries this whenever it would otherwise pick a luminance split, so
+an opaque cartoon usually needs no configuration. Naming it explicitly is for
+when you want it regardless of what `auto` would have decided.
+
+It declines rather than guesses. A border that is not one colour — any
+photograph — gives it nothing to seed from, and a flood that swallows almost
+everything, or barely moves, is discarded. In both cases the luminance split
+stands, so asking for `subject` is never worse than not asking.
+
+`threshold` sets how far a colour may drift from the border and still count as
+background, defaulting to `0.12`. Raise it for a background with a gradient;
+lower it if the flood leaks through a gap in an outline.
 
 `threshold` runs 0 to 1 and defaults to `0.5` for the luminance masks. Push it toward 0 to keep only the deepest shadows, toward 1 to keep almost everything.
 

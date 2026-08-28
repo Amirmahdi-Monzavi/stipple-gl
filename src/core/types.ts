@@ -47,7 +47,7 @@ export type ImageSource =
  * image is never what anyone wants, because every pixel qualifies and the
  * "shape" comes out as the source rectangle.
  */
-export type ImageMask = 'auto' | 'alpha' | 'dark' | 'light';
+export type ImageMask = 'auto' | 'alpha' | 'dark' | 'light' | 'subject';
 
 /**
  * How the particle budget is spread across the ink.

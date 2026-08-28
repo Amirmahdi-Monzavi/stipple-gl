@@ -29,11 +29,14 @@ This release restructures the public API. Nothing is published yet, so the break
 
 - **Raster image sources.** PNG, JPEG, WebP, AVIF, GIF, a canvas, an ImageBitmap or a video frame can all be a shape. Decoding goes through `createImageBitmap`, so the supported list is whatever the browser decodes rather than anything hardcoded.
 - **`shapeFromFile(file)`** picks the strategy for you: vector for plain SVG, rasterised for SVG that uses gradients, filters, patterns or stylesheets, and the image decoder for everything else. `svgNeedsRaster` exposes the test.
-- **`mask` and `threshold` on a shape** — `'auto'` (default), `'alpha'`, `'dark'` or `'light'`. See Fixed for what `auto` does.
+- **`mask` and `threshold` on a shape** — `'auto'` (default), `'alpha'`, `'dark'`, `'light'` or `'subject'`. See Fixed for what `auto` does.
 - `imageFromURL`, `imageFromBlob`, `rasterizeSVG`, `shapeFromImage`, `shapeFromImageURL` and `shapeFromSVGImage`.
 - **`detail` and `detailStrength` on a shape** — `'uniform'` (default), `'edges'` or `'density'`. Uniform sampling over a flat-filled illustration spends ~86% of the budget on featureless interior and reads as a silhouette; edge weighting puts 2.4x more particles on contours for a 3% loss of coverage.
 - `docs/images.md`.
 - **`isSupported()`** — a pre-flight check so an unsupported browser is a branch rather than a `try`/`catch`. It releases its probe context immediately, since browsers cap live contexts at around sixteen and a check that consumed one would be a poor trade for a boolean, and memoises the answer: measured at 15.5 ms for the first call and 0 ms thereafter. Returns `false` without a DOM, so the same branch works either side of hydration. Exported from the root, the lite entry and the script-tag build.
+
+- **`mask: 'subject'`, and `auto` reaches for it.** Luminance masking cannot separate a white glove inside a black outline from the white page behind it, because the pixels are identical — so an opaque cartoon lost every enclosed light region and came out full of holes. What distinguishes them is reachability, not brightness: the page touches the edge of the image and the glove is walled in. The new mask floods inward from the border and keeps whatever the flood cannot reach. Measured on an opaque export of the same artwork: white particles went from 0 to 348, against 318 for the transparent version of the same figure, which is the reference.
+- It declines rather than guesses. A border that is not one colour gives it nothing to seed from, and a flood covering under 8% or over 92% of the frame is discarded, so a photograph falls straight back to the split it used before. Asking for it is never worse than not asking.
 
 ### Changed
 
